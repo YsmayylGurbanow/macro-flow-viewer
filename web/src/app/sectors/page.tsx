@@ -8,20 +8,8 @@ import React, {
   useState,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MarkdownBrief } from "@/components/MarkdownBrief";
-import {
-  Activity,
-  AlertCircle,
-  BarChart3,
-  Building2,
-  Check,
-  Copy,
-  Gauge,
-  History,
-  RefreshCw,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, Check, Copy, RefreshCw } from "lucide-react";
 import {
   Area,
   Bar,
@@ -36,7 +24,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  folioStaggerContainer,
+  folioStaggerItem,
+} from "@/components/FolioTransitionProvider";
+import { InfoSeal } from "@/components/InfoSeal";
+import { LedgerCounter } from "@/components/LedgerCounter";
+import { MarkdownBrief } from "@/components/MarkdownBrief";
 import { API_BASE_URL } from "@/lib/api";
+import { playBrassTick, playInkStamp } from "@/lib/archivalAudio";
 
 interface FiscalFlowRow {
   fiscal_year: number;
@@ -193,64 +189,64 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-const REGIME_COLORS: Record<
+const REGIME_INKS: Record<
   string,
   { badge: string; band: string; dot: string }
 > = {
   Hiking: {
-    badge: "border-rose-500/40 bg-rose-500/15 text-rose-300",
-    band: "#f43f5e",
-    dot: "bg-rose-400",
+    badge: "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]",
+    band: "#9E2A2B",
+    dot: "bg-[#9E2A2B]",
   },
   Cutting: {
-    badge: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
-    band: "#10b981",
-    dot: "bg-emerald-400",
+    badge: "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]",
+    band: "#4F6D5A",
+    dot: "bg-[#4F6D5A]",
   },
   "High-Pause": {
-    badge: "border-amber-500/40 bg-amber-500/15 text-amber-300",
-    band: "#f59e0b",
-    dot: "bg-amber-400",
+    badge: "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]",
+    band: "#B5892E",
+    dot: "bg-[#B5892E]",
   },
   "Low-Pause": {
-    badge: "border-sky-500/40 bg-sky-500/15 text-sky-300",
-    band: "#38bdf8",
-    dot: "bg-sky-400",
+    badge: "border-[#2B5B6C] bg-[#2B5B6C]/15 text-[#1F4452]",
+    band: "#2B5B6C",
+    dot: "bg-[#2B5B6C]",
   },
 };
 
 function getRegimeStyle(regime: string | null | undefined) {
-  if (!regime || !(regime in REGIME_COLORS)) {
+  if (!regime || !(regime in REGIME_INKS)) {
     return {
-      badge: "border-slate-700 bg-slate-800/80 text-slate-300",
-      band: "#64748b",
-      dot: "bg-slate-400",
+      badge: "border-[#A8967A] bg-[#FAF4E6] text-[#594A3C]",
+      band: "#594A3C",
+      dot: "bg-[#594A3C]",
     };
   }
-  return REGIME_COLORS[regime];
+  return REGIME_INKS[regime];
 }
 
 function getValuationBadgeStyle(zone: string): string {
   if (zone === "Cheap") {
-    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+    return "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]";
   }
   if (zone === "Expensive") {
-    return "border-rose-500/40 bg-rose-500/15 text-rose-300";
+    return "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]";
   }
   if (zone === "Fair" || zone === "Normal") {
-    return "border-amber-500/40 bg-amber-500/15 text-amber-200";
+    return "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]";
   }
-  return "border-slate-700 bg-slate-800 text-slate-300";
+  return "border-[#A8967A] bg-[#F2E8D5] text-[#594A3C]";
 }
 
 function getImpulseBadgeStyle(label: string): string {
   if (label === "Accelerating") {
-    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+    return "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]";
   }
   if (label === "Contracting") {
-    return "border-rose-500/40 bg-rose-500/15 text-rose-300";
+    return "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]";
   }
-  return "border-amber-500/40 bg-amber-500/15 text-amber-200";
+  return "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]";
 }
 
 function formatZScore(value: number | null | undefined): string {
@@ -263,11 +259,11 @@ function formatZScore(value: number | null | undefined): string {
 
 function formatReturnTextColor(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "text-slate-500";
+    return "text-[#594A3C]";
   }
   return value >= 0
-    ? "font-semibold text-emerald-400"
-    : "font-semibold text-rose-400";
+    ? "font-semibold text-[#2F4E3C]"
+    : "font-semibold text-[#9E2A2B]";
 }
 
 function formatPct(value: number | null | undefined, signed = true): string {
@@ -361,39 +357,39 @@ function FiscalValuationTooltip({
   }
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 text-xs shadow-xl backdrop-blur">
-      <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-slate-800 pb-1 font-semibold text-slate-100">
+    <div className="border border-[#2A2118] bg-[#FAF4E6] p-3 text-xs text-[#1C1610] shadow-[inset_0_0_0_2px_#FAF4E6,inset_0_0_0_3px_#A8967A,0_10px_20px_-8px_rgba(28,22,16,0.3)]">
+      <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-[#C8B9A0] pb-1 font-mono font-semibold text-[#1C1610]">
         <span>{label}</span>
-        <span className="text-slate-400">FY{row.fiscal_year}</span>
+        <span className="text-[#594A3C]">FY{row.fiscal_year}</span>
       </div>
-      <div className="space-y-1 tabular-nums">
+      <div className="space-y-1 font-mono tabular-nums">
         <div className="flex justify-between gap-4">
-          <span className="text-sky-300">Obligations:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#2B5B6C]">Obligations:</span>
+          <span className="font-semibold text-[#1C1610]">
             {formatUsdCompact(row.obligations_raw)}
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-amber-300">Fiscal YoY:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#9E2A2B]">Fiscal YoY:</span>
+          <span className="font-semibold text-[#1C1610]">
             {formatPct(row.yoy_growth_pct)}
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-emerald-300">ETF Close:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#4F6D5A]">ETF Close:</span>
+          <span className="font-semibold text-[#1C1610]">
             {row.close_price !== null ? `$${row.close_price.toFixed(2)}` : "—"}
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-yellow-300">ETF / GLD:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#7D5C19]">ETF / GLD:</span>
+          <span className="font-semibold text-[#1C1610]">
             {row.gold_ratio !== null ? row.gold_ratio.toFixed(4) : "—"}
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-violet-300">ETF / SPY:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#594A3C]">ETF / SPY:</span>
+          <span className="font-semibold text-[#1C1610]">
             {row.spy_ratio !== null ? row.spy_ratio.toFixed(4) : "—"}
           </span>
         </div>
@@ -413,31 +409,35 @@ function RateRegimeTooltip({ active, payload, label }: CustomTooltipProps) {
   const style = getRegimeStyle(row.regime_label);
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 text-xs shadow-xl backdrop-blur">
-      <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-slate-800 pb-1">
-        <span className="font-semibold text-slate-100">{label}</span>
+    <div className="border border-[#2A2118] bg-[#FAF4E6] p-3 text-xs text-[#1C1610] shadow-[inset_0_0_0_2px_#FAF4E6,inset_0_0_0_3px_#A8967A,0_10px_20px_-8px_rgba(28,22,16,0.3)]">
+      <div className="mb-1.5 flex items-center justify-between gap-4 border-b border-[#C8B9A0] pb-1">
+        <span className="font-mono font-semibold text-[#1C1610]">{label}</span>
         <span
-          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${style.badge}`}
+          className={`border px-2 py-0.5 font-display text-[10px] font-semibold ${style.badge}`}
         >
           {row.regime_label}
         </span>
       </div>
-      <div className="space-y-1 tabular-nums">
+      <div className="space-y-1 font-mono tabular-nums">
         <div className="flex justify-between gap-4">
-          <span className="text-sky-300">Fed Funds:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#2B5B6C]">Fed Funds:</span>
+          <span className="font-semibold text-[#1C1610]">
             {row.fed_funds.toFixed(2)}%
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-amber-300">10Y Treasury (DGS10):</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#7D5C19]">
+            10Y Treasury:
+          </span>
+          <span className="font-semibold text-[#1C1610]">
             {row.dgs10.toFixed(2)}%
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-emerald-300">10Y-FF Spread:</span>
-          <span className="font-medium text-slate-100">
+          <span className="font-serif italic text-[#4F6D5A]">
+            10Y–FF Spread:
+          </span>
+          <span className="font-semibold text-[#1C1610]">
             {formatPct(row.yield_spread)}
           </span>
         </div>
@@ -467,6 +467,9 @@ function SectorsWorkspace() {
   }, [queryTicker]);
 
   const handleSelectSector = (ticker: string) => {
+    if (ticker !== selectedTicker) {
+      playBrassTick();
+    }
     setSelectedTicker(ticker);
     router.replace(`/sectors?ticker=${ticker}`, { scroll: false });
   };
@@ -529,6 +532,7 @@ function SectorsWorkspace() {
 
   const handleRefreshAnalysis = async () => {
     if (refreshingBrief) return;
+    playInkStamp();
     setRefreshingBrief(true);
     try {
       const res = await fetch(
@@ -558,6 +562,7 @@ function SectorsWorkspace() {
 
   const handleCopySocialBrief = async () => {
     if (!detail) return;
+    playInkStamp();
     const text = buildSocialExportText(detail);
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -665,24 +670,23 @@ function SectorsWorkspace() {
   const currentRegimeStyle = getRegimeStyle(currentRegimeLabel);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="flex flex-col justify-between gap-3 border-b border-slate-800/80 pb-4 sm:flex-row sm:items-center">
+    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      {/* Slim Archival Masthead */}
+      <header className="flex flex-col justify-between gap-4 border-b border-[#2A2118] pb-4 sm:flex-row sm:items-end">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-sky-400">
-            <Activity className="h-4 w-4" />
-            <span>US Macro Capital-Flow Decision Panel</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
-            Fiscal Impulse, Rate Regimes &amp; Sector Relative Value
+          <span className="font-script text-2xl text-[#9E2A2B]">
+            Folio III &middot; Federal Outlays &amp; Rate Regimes
+          </span>
+          <h1 className="font-display text-3xl font-bold tracking-wide text-[#1C1610]">
+            Fiscal &amp; Sector Flows Ledger
           </h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 text-xs">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-            <span className="text-slate-400">Active Rate Regime:</span>
+          <div className="flex items-center gap-2 border border-[#2A2118] bg-[#FAF4E6] px-2.5 py-1">
+            <span className="font-serif italic text-[#594A3C]">Regime:</span>
             <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-semibold ${currentRegimeStyle.badge}`}
+              className={`inline-flex items-center gap-1.5 border px-2 py-0.5 font-display font-semibold ${currentRegimeStyle.badge}`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${currentRegimeStyle.dot}`}
@@ -690,27 +694,23 @@ function SectorsWorkspace() {
               {currentRegimeLabel}
             </span>
           </div>
+
           {overview?.current_rate_regime && (
-            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5 tabular-nums text-slate-300">
-              FF:{" "}
-              <span className="font-semibold text-white">
-                {overview.current_rate_regime.fed_funds.toFixed(2)}%
-              </span>{" "}
-              | 10Y:{" "}
-              <span className="font-semibold text-white">
-                {overview.current_rate_regime.dgs10.toFixed(2)}%
-              </span>
+            <div className="border border-[#A8967A] bg-[#FAF4E6] px-2.5 py-1.5 font-mono tabular-nums text-[#1C1610]">
+              FF {overview.current_rate_regime.fed_funds.toFixed(2)}% &middot;
+              10Y {overview.current_rate_regime.dgs10.toFixed(2)}%
             </div>
           )}
+
           <button
             type="button"
             onClick={handleCopySocialBrief}
             disabled={!detail || loadingDetail}
             title="Copy formatted 5-line macro summary for X / Telegram"
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`inline-flex items-center gap-1.5 border px-3 py-1.5 font-display text-xs font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-50 ${
               copiedBrief
-                ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
-                : "border-sky-500/40 bg-sky-500/15 text-sky-300 hover:bg-sky-500/25"
+                ? "border-[#4F6D5A] bg-[#4F6D5A] text-[#FAF4E6]"
+                : "border-[#2A2118] bg-[#FAF4E6] text-[#1C1610] hover:border-[#9E2A2B] hover:text-[#9E2A2B]"
             }`}
           >
             {copiedBrief ? (
@@ -725,37 +725,70 @@ function SectorsWorkspace() {
               </>
             )}
           </button>
+
+          <InfoSeal
+            title="Fiscal & Sector Flows Ledger"
+            summary="Maps federal agency budgetary resources from USAspending.gov against sector ETF prices, FRED interest rate regimes, and Gold/SPY relative valuations."
+            howToRead="Select any of the 6 sector cards below to inspect its 10-year fiscal Z-score, valuation percentile gauge, rate regime timeline, and historical regime analogs."
+          />
         </div>
       </header>
 
-      {/* Connection / API Error Banner */}
       {errorMsg && (
-        <div className="flex items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
-          <div>
-            <p className="font-semibold">Backend Connection Issue</p>
-            <p className="mt-0.5 text-xs text-rose-200/80">{errorMsg}</p>
-            <p className="mt-1 text-xs text-slate-300">
-              Ensure the Rust API server is running on{" "}
-              <code className="rounded bg-slate-900 px-1.5 py-0.5 font-mono text-sky-300">
-                {API_BASE_URL}
-              </code>{" "}
-              via <code className="font-mono text-sky-300">cargo run</code>.
-            </p>
-          </div>
+        <div className="flex items-start gap-3 border border-[#9E2A2B] bg-[#FAF4E6] p-4 text-sm text-[#9E2A2B]">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="font-serif">{errorMsg}</p>
         </div>
       )}
 
-      {/* Top Sector Selector Bar */}
-      <section aria-label="Sector Selector" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(overview?.sectors ?? [
-          { ticker: "ITA", sector_name: "Defense", agency_code: "097", agency_name: "Defense" },
-          { ticker: "XLE", sector_name: "Energy", agency_code: "089", agency_name: "Energy" },
-          { ticker: "XLV", sector_name: "Healthcare", agency_code: "075", agency_name: "HHS" },
-          { ticker: "IYT", sector_name: "Transportation", agency_code: "069", agency_name: "Transportation" },
-          { ticker: "XLK", sector_name: "Technology", agency_code: "013", agency_name: "Commerce" },
-          { ticker: "PAVE", sector_name: "Infrastructure", agency_code: "069", agency_name: "Transportation" },
-        ]).map((sector) => {
+      {/* 6-Sector Engraved Selector Plates */}
+      <motion.section
+        variants={folioStaggerContainer}
+        initial="hidden"
+        animate="visible"
+        aria-label="Sector Selector"
+        className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {(
+          overview?.sectors ?? [
+            {
+              ticker: "ITA",
+              sector_name: "Defense",
+              agency_code: "097",
+              agency_name: "Defense",
+            },
+            {
+              ticker: "XLE",
+              sector_name: "Energy",
+              agency_code: "089",
+              agency_name: "Energy",
+            },
+            {
+              ticker: "XLV",
+              sector_name: "Healthcare",
+              agency_code: "075",
+              agency_name: "HHS",
+            },
+            {
+              ticker: "IYT",
+              sector_name: "Transportation",
+              agency_code: "069",
+              agency_name: "Transportation",
+            },
+            {
+              ticker: "XLK",
+              sector_name: "Technology",
+              agency_code: "013",
+              agency_name: "Commerce",
+            },
+            {
+              ticker: "PAVE",
+              sector_name: "Infrastructure",
+              agency_code: "069",
+              agency_name: "Transportation",
+            },
+          ]
+        ).map((sector) => {
           const isSelected = sector.ticker === selectedTicker;
           const card = "valuation_zone" in sector ? sector : null;
           const zone = card?.valuation_zone ?? "Unknown";
@@ -767,32 +800,45 @@ function SectorsWorkspace() {
           const regimeBadge = getRegimeStyle(card?.current_regime_label);
 
           return (
-            <button
+            <motion.button
               key={sector.ticker}
+              variants={folioStaggerItem}
+              whileTap={{ scale: 0.985 }}
               type="button"
               onClick={() => handleSelectSector(sector.ticker)}
-              className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
+              className={`relative flex flex-col justify-between border border-[#2A2118] p-4 text-left transition-colors ${
                 isSelected
-                  ? "border-sky-500 bg-slate-900 shadow-lg shadow-sky-950/40 ring-1 ring-sky-500/40"
-                  : "border-slate-800 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900/90"
+                  ? "bg-[#FAF4E6]"
+                  : "bg-[#FAF4E6]/85 shadow-[inset_0_0_0_2px_#FAF4E6,inset_0_0_0_3px_#C8B9A0] hover:bg-[#FAF4E6]"
               }`}
             >
+              {isSelected && (
+                <motion.span
+                  layoutId="active-sector-frame"
+                  transition={{
+                    type: "spring",
+                    stiffness: 360,
+                    damping: 30,
+                  }}
+                  className="pointer-events-none absolute inset-0 z-10 border border-[#9E2A2B] shadow-[inset_0_0_0_2px_#FAF4E6,inset_0_0_0_3px_#9E2A2B,0_10px_22px_-14px_rgba(28,22,16,0.35)]"
+                />
+              )}
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold tracking-tight text-white">
+                    <span className="font-mono text-lg font-semibold text-[#1C1610]">
                       {sector.ticker}
                     </span>
-                    <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-slate-400">
+                    <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-1.5 py-0.5 font-mono text-[10px] text-[#594A3C]">
                       AG-{sector.agency_code}
                     </span>
                   </div>
-                  <p className="text-xs font-medium text-slate-400">
+                  <p className="font-serif text-xs italic text-[#594A3C]">
                     {sector.sector_name} ({sector.agency_name})
                   </p>
                 </div>
                 <span
-                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getValuationBadgeStyle(
+                  className={`border px-2 py-0.5 font-display text-xs font-semibold ${getValuationBadgeStyle(
                     zone
                   )}`}
                 >
@@ -800,188 +846,210 @@ function SectorsWorkspace() {
                 </span>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-800/80 pt-3 text-xs tabular-nums">
+              <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-[#C8B9A0] pt-2.5 text-xs font-mono tabular-nums">
                 <div>
-                  <span className="block text-[11px] text-slate-500">
-                    Fiscal YoY / Z-Score
+                  <span className="block font-serif text-[11px] italic text-[#594A3C]">
+                    Fiscal YoY / 5Y Z
                   </span>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                     <span
                       className={`font-semibold ${
                         yoy === null
-                          ? "text-slate-400"
+                          ? "text-[#594A3C]"
                           : yoy >= 0
-                            ? "text-emerald-400"
-                            : "text-rose-400"
+                            ? "text-[#2F4E3C]"
+                            : "text-[#9E2A2B]"
                       }`}
                     >
-                      {loadingOverview ? "..." : formatPct(yoy)}
+                      {loadingOverview ? (
+                        "..."
+                      ) : (
+                        <LedgerCounter value={yoy} decimals={1} signed suffix="%" />
+                      )}
                     </span>
                     <span
-                      className={`rounded border px-1.5 py-0.2 text-[10px] font-medium ${getImpulseBadgeStyle(
+                      className={`border px-1.5 py-0.5 text-[10px] font-medium ${getImpulseBadgeStyle(
                         impulseLabel
                       )}`}
                     >
-                      {loadingOverview
-                        ? "..."
-                        : `${impulseLabel} (${formatZScore(zscore)})`}
+                      {loadingOverview ? (
+                        "..."
+                      ) : (
+                        <>
+                          {impulseLabel} (
+                          <LedgerCounter value={zscore} decimals={2} signed />)
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="block text-[11px] text-slate-500">
+                  <span className="block font-serif text-[11px] italic text-[#594A3C]">
                     10Y Rank / Regime
                   </span>
                   <div className="mt-0.5 flex items-center justify-end gap-1.5">
-                    <span className="font-semibold text-slate-200">
-                      {pct !== null ? `${pct.toFixed(0)}%` : "—"}
+                    <span className="font-semibold text-[#1C1610]">
+                      <LedgerCounter value={pct} decimals={0} suffix="%" />
                     </span>
                     <span
-                      className={`rounded border px-1.5 py-0.2 text-[10px] font-medium ${regimeBadge.badge}`}
+                      className={`border px-1.5 py-0.5 font-display text-[10px] font-semibold ${regimeBadge.badge}`}
                     >
                       {regime}
                     </span>
                   </div>
                 </div>
               </div>
-            </button>
+            </motion.button>
           );
         })}
-      </section>
+      </motion.section>
 
       {/* Main Decision Workspace */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-        {/* Left Column: Charts (8 cols on XL) */}
-        <div className="flex flex-col gap-5 xl:col-span-8">
-          {/* Valuation Percentile Gauge + Key Telemetry Strip */}
-          <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2.5">
-                <Gauge className="h-5 w-5 text-sky-400" />
-                <div>
-                  <h2 className="text-sm font-semibold text-white">
-                    10-Year Valuation Percentile Gauge — {selectedTicker}
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Blended relative valuation rank vs. Gold (GLD) &amp; S&amp;P
-                    500 (SPY)
-                  </p>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        {/* Left Column: Gauge & Charts (8 cols) */}
+        <div className="flex flex-col gap-6 xl:col-span-8">
+          {/* Valuation Percentile Gauge */}
+          <section className="ledger-plate p-5">
+            <div className="relative flex flex-col items-center pb-3">
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-baseline gap-2 font-mono tabular-nums">
+                  <span className="font-serif text-xs italic text-[#594A3C]">
+                    Percentile:
+                  </span>
+                  <span className="text-xl font-semibold text-[#1C1610]">
+                    <LedgerCounter value={currentPercentile} decimals={1} suffix="%" />
+                  </span>
+                  <span
+                    className={`border px-2 py-0.5 font-display text-xs font-semibold ${getValuationBadgeStyle(
+                      detail?.valuation_zone ??
+                        activeCard?.valuation_zone ??
+                        "Unknown"
+                    )}`}
+                  >
+                    {detail?.valuation_zone ??
+                      activeCard?.valuation_zone ??
+                      "Unknown"}
+                  </span>
                 </div>
+                <InfoSeal
+                  title="10-Year Valuation Percentile Gauge"
+                  summary="Blends the ETF's 10-year historical percentile rank relative to Gold (ETF/GLD) and the S&P 500 (ETF/SPY)."
+                  howToRead="Below 25% marks the Cheap quartile (Sage); 25%–75% is Normal; above 75% marks Expensive (Crimson)."
+                />
               </div>
 
-              <div className="flex items-center gap-3 tabular-nums">
-                <div className="text-right">
-                  <span className="block text-[11px] text-slate-500">
-                    Current Percentile
-                  </span>
-                  <span className="text-xl font-bold text-white">
-                    {currentPercentile !== null
-                      ? `${currentPercentile.toFixed(1)}%`
-                      : "—"}
-                  </span>
-                </div>
-                <span
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${getValuationBadgeStyle(
-                    detail?.valuation_zone ?? activeCard?.valuation_zone ?? "Unknown"
-                  )}`}
-                >
-                  {detail?.valuation_zone ?? activeCard?.valuation_zone ?? "Unknown"}
-                </span>
+              <div className="ledger-title-plate mt-2 px-5 py-1 text-center">
+                <h2 className="font-display text-base font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                  10-Year Valuation Gauge &mdash; {selectedTicker}
+                </h2>
               </div>
             </div>
 
-            {/* 0-100% Gauge Bar */}
-            <div className="mt-4">
-              <div className="relative h-4 w-full overflow-hidden rounded-full bg-slate-800 ring-1 ring-slate-700/80">
-                {/* <25% Cheap */}
+            {/* Engraved Watercolor Gauge Bar */}
+            <div className="mt-3">
+              <div className="relative h-4 w-full overflow-hidden border border-[#2A2118] bg-[#F2E8D5]">
                 <div
-                  className="absolute inset-y-0 left-0 bg-emerald-500/35"
+                  className="absolute inset-y-0 left-0 bg-[#4F6D5A]/30"
                   style={{ width: "25%" }}
                 />
-                {/* 25-75% Normal */}
                 <div
-                  className="absolute inset-y-0 bg-amber-500/20"
+                  className="absolute inset-y-0 bg-[#B5892E]/18"
                   style={{ left: "25%", width: "50%" }}
                 />
-                {/* >75% Expensive */}
                 <div
-                  className="absolute inset-y-0 right-0 bg-rose-500/35"
+                  className="absolute inset-y-0 right-0 bg-[#9E2A2B]/30"
                   style={{ width: "25%" }}
                 />
-
-                {/* Threshold dividers */}
                 <div
-                  className="absolute inset-y-0 w-0.5 bg-slate-400/60"
+                  className="absolute inset-y-0 w-[1px] bg-[#2A2118]"
                   style={{ left: "25%" }}
                 />
                 <div
-                  className="absolute inset-y-0 w-0.5 bg-slate-400/60"
+                  className="absolute inset-y-0 w-[1px] bg-[#2A2118]"
                   style={{ left: "75%" }}
                 />
-
-                {/* Current Marker */}
                 {clampedPercentile !== null && (
-                  <div
-                    className="absolute top-0 bottom-0 w-1.5 -translate-x-1/2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)] transition-all duration-300"
-                    style={{ left: `${clampedPercentile}%` }}
+                  <motion.div
+                    initial={{ left: "0%" }}
+                    animate={{ left: `${clampedPercentile}%` }}
+                    transition={{ type: "spring", stiffness: 180, damping: 24 }}
+                    className="absolute top-0 bottom-0 w-1.5 -translate-x-1/2 bg-[#1C1610] shadow-[0_0_0_1px_#FAF4E6]"
                   />
                 )}
               </div>
 
-              <div className="mt-1.5 flex justify-between text-[11px] font-medium text-slate-400 tabular-nums">
-                <span className="text-emerald-400">0% – 25% Cheap</span>
-                <span className="text-amber-300">25% – 75% Normal</span>
-                <span className="text-rose-400">75% – 100% Expensive</span>
+              <div className="mt-1.5 flex justify-between font-mono text-[11px] font-medium tabular-nums">
+                <span className="text-[#2F4E3C]">0–25% Cheap</span>
+                <span className="text-[#7D5C19]">25–75% Normal</span>
+                <span className="text-[#9E2A2B]">75–100% Expensive</span>
               </div>
             </div>
 
-            {/* Telemetry Cards */}
-            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-800/80 pt-4 sm:grid-cols-5">
-              <div className="rounded-lg bg-slate-950/60 p-2.5 tabular-nums">
-                <span className="block text-[11px] text-slate-500">
+            {/* 5 Telemetry Cells */}
+            <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-[#C8B9A0] pt-3.5 text-xs font-mono tabular-nums sm:grid-cols-5">
+              <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2.5">
+                <span className="block font-serif text-[11px] italic text-[#594A3C]">
                   ETF Close
                 </span>
-                <span className="text-sm font-semibold text-white">
-                  {detail?.latest_valuation
-                    ? `$${detail.latest_valuation.close_price.toFixed(2)}`
-                    : "—"}
+                <span className="text-sm font-semibold text-[#1C1610]">
+                  <LedgerCounter
+                    value={detail?.latest_valuation?.close_price}
+                    decimals={2}
+                    prefix="$"
+                  />
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-950/60 p-2.5 tabular-nums">
-                <span className="block text-[11px] text-slate-500">
-                  ETF / GLD (Gold %ile)
+              <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2.5">
+                <span className="block font-serif text-[11px] italic text-[#594A3C]">
+                  ETF / GLD (%ile)
                 </span>
-                <span className="text-sm font-semibold text-yellow-300">
-                  {detail?.latest_valuation
-                    ? `${detail.latest_valuation.gold_ratio.toFixed(4)}${
-                        detail.gold_valuation_percentile !== null &&
-                        detail.gold_valuation_percentile !== undefined
-                          ? ` (${detail.gold_valuation_percentile.toFixed(0)}%)`
-                          : ""
-                      }`
-                    : "—"}
+                <span className="text-sm font-semibold text-[#7D5C19]">
+                  {detail?.latest_valuation ? (
+                    <>
+                      <LedgerCounter
+                        value={detail.latest_valuation.gold_ratio}
+                        decimals={4}
+                      />
+                      {detail.gold_valuation_percentile !== null &&
+                        detail.gold_valuation_percentile !== undefined && (
+                          <LedgerCounter
+                            value={detail.gold_valuation_percentile}
+                            decimals={0}
+                            prefix=" ("
+                            suffix="%)"
+                          />
+                        )}
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-950/60 p-2.5 tabular-nums">
-                <span className="block text-[11px] text-slate-500">
-                  ETF / SPY Ratio
+              <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2.5">
+                <span className="block font-serif text-[11px] italic text-[#594A3C]">
+                  ETF / SPY
                 </span>
-                <span className="text-sm font-semibold text-violet-300">
-                  {detail?.latest_valuation
-                    ? detail.latest_valuation.spy_ratio.toFixed(4)
-                    : "—"}
+                <span className="text-sm font-semibold text-[#2B5B6C]">
+                  <LedgerCounter
+                    value={detail?.latest_valuation?.spy_ratio}
+                    decimals={4}
+                  />
                 </span>
               </div>
-              <div className="rounded-lg bg-slate-950/60 p-2.5 tabular-nums">
-                <span className="block text-[11px] text-slate-500">
-                  Fiscal Impulse (5Y Z)
+              <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2.5">
+                <span className="block font-serif text-[11px] italic text-[#594A3C]">
+                  Fiscal 5Y Z
                 </span>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span className="text-sm font-semibold text-white">
-                    {formatZScore(detail?.fiscal_impulse_zscore)}
+                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                  <span className="text-sm font-semibold text-[#1C1610]">
+                    <LedgerCounter
+                      value={detail?.fiscal_impulse_zscore}
+                      decimals={2}
+                      signed
+                    />
                   </span>
                   <span
-                    className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${getImpulseBadgeStyle(
+                    className={`border px-1 py-0.5 text-[10px] font-medium ${getImpulseBadgeStyle(
                       detail?.fiscal_impulse_label ?? "Neutral"
                     )}`}
                   >
@@ -989,150 +1057,187 @@ function SectorsWorkspace() {
                   </span>
                 </div>
               </div>
-              <div className="rounded-lg bg-slate-950/60 p-2.5 tabular-nums">
-                <span className="block text-[11px] text-slate-500">
-                  Avg 12M Return in Regime
+              <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2.5">
+                <span className="block font-serif text-[11px] italic text-[#594A3C]">
+                  Avg 12M Regime
                 </span>
                 <span
                   className={`text-sm font-semibold ${
                     detail?.avg_12m_return_in_regime_pct === null ||
                     detail?.avg_12m_return_in_regime_pct === undefined
-                      ? "text-slate-400"
+                      ? "text-[#594A3C]"
                       : detail.avg_12m_return_in_regime_pct >= 0
-                        ? "text-emerald-400"
-                        : "text-rose-400"
+                        ? "text-[#2F4E3C]"
+                        : "text-[#9E2A2B]"
                   }`}
                 >
-                  {formatPct(detail?.avg_12m_return_in_regime_pct)}
+                  <LedgerCounter
+                    value={detail?.avg_12m_return_in_regime_pct}
+                    decimals={1}
+                    signed
+                    suffix="%"
+                  />
                 </span>
               </div>
             </div>
           </section>
 
           {/* Chart 1: Fiscal Flow vs. Sector Valuation */}
-          <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2.5">
-                <BarChart3 className="h-5 w-5 text-sky-400" />
-                <div>
-                  <h2 className="text-sm font-semibold text-white">
-                    Chart 1: Fiscal Flow vs. Sector Valuation ({selectedTicker}
-                    )
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    10-year agency obligations ($B) &amp; YoY growth % overlaid
-                    with ETF price, GLD ratio &amp; SPY ratio
-                  </p>
-                </div>
-              </div>
-              <span
-                className={`inline-flex items-center gap-1.5 self-start rounded-lg border px-2.5 py-1 text-xs font-medium ${getImpulseBadgeStyle(
-                  detail?.fiscal_impulse_label ?? "Neutral"
-                )}`}
-              >
-                <Building2 className="h-3.5 w-3.5" />
-                Impulse:{" "}
-                <strong>{detail?.fiscal_impulse_label ?? "—"}</strong>{" "}
-                <span className="font-mono">
-                  (Z: {formatZScore(detail?.fiscal_impulse_zscore)})
+          <section className="ledger-plate p-5">
+            <div className="relative mb-4 flex flex-col items-center">
+              <div className="flex w-full items-center justify-between">
+                <span
+                  className={`border px-2.5 py-0.5 font-mono text-[11px] font-medium ${getImpulseBadgeStyle(
+                    detail?.fiscal_impulse_label ?? "Neutral"
+                  )}`}
+                >
+                  Impulse: {detail?.fiscal_impulse_label ?? "—"} (Z:{" "}
+                  {formatZScore(detail?.fiscal_impulse_zscore)})
                 </span>
-              </span>
+                <InfoSeal
+                  title="Chart I: Fiscal Flow vs. Valuation"
+                  summary="Overlays 10-year mapped federal agency obligations ($B) and YoY spending growth (%) against the ETF close price, ETF/GLD ratio, and ETF/SPY ratio."
+                  howToRead="Look for inflections where surging agency obligations (bars) and positive YoY impulse coincide with depressed valuation ratios."
+                />
+              </div>
+
+              <div className="ledger-title-plate mt-2 px-5 py-1 text-center">
+                <h2 className="font-display text-base font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                  Plate I: Fiscal Flow vs. Valuation ({selectedTicker})
+                </h2>
+              </div>
             </div>
 
-            <div className="h-[310px] w-full">
+            <div className="millimeter-paper h-[310px] w-full p-2">
               {loadingDetail ? (
-                <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                  Loading fiscal &amp; valuation time series...
+                <div className="flex h-full items-center justify-center font-serif text-sm italic text-[#594A3C]">
+                  Drawing fiscal &amp; valuation series...
                 </div>
               ) : chart1Data.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                  No fiscal spending or valuation data available yet. Run
-                  ingestion first.
+                <div className="flex h-full items-center justify-center font-serif text-sm italic text-[#594A3C]">
+                  No fiscal spending or valuation observations available.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
+                    key={`chart1-${selectedTicker}`}
                     data={chart1Data}
                     margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+                    <CartesianGrid stroke="#C8B9A0" strokeDasharray="2 3" />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatShortDate}
-                      stroke="#64748b"
-                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      stroke="#594A3C"
+                      tick={{
+                        fill: "#594A3C",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
                       minTickGap={28}
                     />
                     <YAxis
                       yAxisId="fiscal"
                       orientation="left"
-                      stroke="#38bdf8"
-                      tick={{ fill: "#38bdf8", fontSize: 11 }}
+                      stroke="#2B5B6C"
+                      tick={{
+                        fill: "#2B5B6C",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
                       tickFormatter={(v: number) => `$${v}B`}
                       width={60}
                     />
                     <YAxis
                       yAxisId="price"
                       orientation="right"
-                      stroke="#10b981"
-                      tick={{ fill: "#10b981", fontSize: 11 }}
+                      stroke="#4F6D5A"
+                      tick={{
+                        fill: "#2F4E3C",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
                       tickFormatter={(v: number) => `$${v}`}
                       width={52}
                     />
                     <YAxis yAxisId="ratio" hide domain={["auto", "auto"]} />
                     <YAxis yAxisId="yoy" hide domain={["auto", "auto"]} />
-                    <Tooltip content={<FiscalValuationTooltip />} />
+                    <Tooltip
+                      cursor={{ stroke: "#9E2A2B", strokeDasharray: "3 3" }}
+                      content={<FiscalValuationTooltip />}
+                    />
                     <Legend
-                      wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
+                      wrapperStyle={{
+                        fontSize: "11px",
+                        paddingTop: "8px",
+                        fontFamily: "var(--font-serif)",
+                      }}
                     />
                     <Bar
                       yAxisId="fiscal"
                       dataKey="obligations_b"
                       name="Obligations ($B)"
-                      fill="#0284c7"
-                      fillOpacity={0.35}
-                      radius={[2, 2, 0, 0]}
+                      fill="#2B5B6C"
+                      fillOpacity={0.28}
+                      stroke="#2B5B6C"
+                      strokeOpacity={0.6}
+                      radius={[1, 1, 0, 0]}
+                      isAnimationActive={true}
+                      animationDuration={560}
+                      animationEasing="ease-out"
                     />
                     <Line
                       yAxisId="price"
                       type="monotone"
                       dataKey="close_price"
                       name={`${selectedTicker} Close ($)`}
-                      stroke="#10b981"
+                      stroke="#1C1610"
                       strokeWidth={2}
                       dot={false}
                       connectNulls
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                     <Line
                       yAxisId="yoy"
                       type="monotone"
                       dataKey="yoy_growth_pct"
                       name="Fiscal YoY %"
-                      stroke="#f59e0b"
+                      stroke="#9E2A2B"
                       strokeWidth={1.75}
                       strokeDasharray="4 3"
                       dot={false}
                       connectNulls
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                     <Line
                       yAxisId="ratio"
                       type="monotone"
                       dataKey="gold_ratio"
                       name="ETF / GLD"
-                      stroke="#eab308"
-                      strokeWidth={1.5}
+                      stroke="#B5892E"
+                      strokeWidth={1.65}
                       dot={false}
                       connectNulls
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                     <Line
                       yAxisId="ratio"
                       type="monotone"
                       dataKey="spy_ratio"
                       name="ETF / SPY"
-                      stroke="#a855f7"
-                      strokeWidth={1.5}
+                      stroke="#4F6D5A"
+                      strokeWidth={1.65}
                       dot={false}
                       connectNulls
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -1141,48 +1246,49 @@ function SectorsWorkspace() {
           </section>
 
           {/* Chart 2: Interest Rate Regime Timeline & Spread */}
-          <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-2.5">
-                <TrendingUp className="h-5 w-5 text-emerald-400" />
-                <div>
-                  <h2 className="text-sm font-semibold text-white">
-                    Chart 2: Interest Rate Regime Timeline &amp; Spread
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    10-year monthly FEDFUNDS, DGS10, and yield spread shaded by
-                    monetary regime
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 text-[11px]">
-                {(["Hiking", "High-Pause", "Cutting", "Low-Pause"] as const).map(
-                  (label) => {
+          <section className="ledger-plate p-5">
+            <div className="relative mb-4 flex flex-col items-center">
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-1.5 font-display text-[11px] font-semibold">
+                  {(
+                    ["Hiking", "High-Pause", "Cutting", "Low-Pause"] as const
+                  ).map((label) => {
                     const st = getRegimeStyle(label);
                     return (
                       <span
                         key={label}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${st.badge}`}
+                        className={`inline-flex items-center gap-1 border px-2 py-0.5 ${st.badge}`}
                       >
-                        <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${st.dot}`}
+                        />
                         {label}
                       </span>
                     );
-                  }
-                )}
+                  })}
+                </div>
+                <InfoSeal
+                  title="Plate II: Rate Regime Timeline"
+                  summary="Plots 10-year monthly Federal Funds (FEDFUNDS), 10-Year Treasury (DGS10), and the 10Y–FF yield spread shaded by deterministic monetary regime."
+                  howToRead="Shaded bands highlight historical regime shifts; matching windows below feed the Historical Regime Analogs matrix."
+                />
+              </div>
+
+              <div className="ledger-title-plate mt-2 px-5 py-1 text-center">
+                <h2 className="font-display text-base font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                  Plate II: Interest Rate Regime Timeline
+                </h2>
               </div>
             </div>
 
-            <div className="h-[290px] w-full">
+            <div className="millimeter-paper h-[290px] w-full p-2">
               {loadingDetail ? (
-                <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                  Loading macro rate regime timeline...
+                <div className="flex h-full items-center justify-center font-serif text-sm italic text-[#594A3C]">
+                  Drawing interest rate regimes...
                 </div>
               ) : !detail || detail.macro_rates.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                  No macro interest rate data available yet. Run ingestion
-                  first.
+                <div className="flex h-full items-center justify-center font-serif text-sm italic text-[#594A3C]">
+                  No macro interest rate observations available.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -1190,63 +1296,106 @@ function SectorsWorkspace() {
                     data={detail.macro_rates}
                     margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+                    <defs>
+                      <linearGradient
+                        id="playfair-spread-wash"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#4F6D5A"
+                          stopOpacity={0.28}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#4F6D5A"
+                          stopOpacity={0.04}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#C8B9A0" strokeDasharray="2 3" />
                     {regimeBands.map((band, idx) => (
                       <ReferenceArea
                         key={`${band.regime}-${idx}`}
                         x1={band.x1}
                         x2={band.x2}
                         fill={getRegimeStyle(band.regime).band}
-                        fillOpacity={0.12}
+                        fillOpacity={0.11}
                         ifOverflow="extendDomain"
                       />
                     ))}
                     <ReferenceLine
                       y={0}
-                      stroke="#64748b"
+                      stroke="#2A2118"
                       strokeDasharray="3 3"
                     />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatShortDate}
-                      stroke="#64748b"
-                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      stroke="#594A3C"
+                      tick={{
+                        fill: "#594A3C",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
                       minTickGap={28}
                     />
                     <YAxis
-                      stroke="#94a3b8"
-                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      stroke="#594A3C"
+                      tick={{
+                        fill: "#594A3C",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
                       tickFormatter={(v: number) => `${v}%`}
                       width={48}
                     />
-                    <Tooltip content={<RateRegimeTooltip />} />
+                    <Tooltip
+                      cursor={{ stroke: "#9E2A2B", strokeDasharray: "3 3" }}
+                      content={<RateRegimeTooltip />}
+                    />
                     <Legend
-                      wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }}
+                      wrapperStyle={{
+                        fontSize: "11px",
+                        paddingTop: "8px",
+                        fontFamily: "var(--font-serif)",
+                      }}
                     />
                     <Area
                       type="monotone"
                       dataKey="yield_spread"
                       name="Yield Spread (10Y - FF)"
-                      stroke="#10b981"
-                      fill="#10b981"
-                      fillOpacity={0.14}
+                      stroke="#4F6D5A"
+                      fill="url(#playfair-spread-wash)"
                       strokeWidth={1.75}
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                     <Line
                       type="monotone"
                       dataKey="fed_funds"
                       name="Fed Funds (%)"
-                      stroke="#38bdf8"
+                      stroke="#2B5B6C"
                       strokeWidth={2}
                       dot={false}
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                     <Line
                       type="monotone"
                       dataKey="dgs10"
                       name="10Y Treasury (%)"
-                      stroke="#f59e0b"
+                      stroke="#9E2A2B"
                       strokeWidth={2}
                       dot={false}
+                      isAnimationActive={true}
+                      animationDuration={640}
+                      animationEasing="ease-out"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -1254,16 +1403,16 @@ function SectorsWorkspace() {
             </div>
 
             {detail && detail.matching_regime_periods.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-3 text-xs">
-                <span className="text-slate-400">
-                  Matching {currentRegimeLabel} Windows:
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#C8B9A0] pt-3 text-xs">
+                <span className="font-serif italic text-[#594A3C]">
+                  {currentRegimeLabel} Windows:
                 </span>
                 {detail.matching_regime_periods.map((period, idx) => (
                   <span
                     key={`${period.start_date}-${idx}`}
-                    className="rounded-md border border-slate-800 bg-slate-950/70 px-2 py-0.5 font-mono text-[11px] text-slate-300"
+                    className="border border-[#C8B9A0] bg-[#F2E8D5] px-2 py-0.5 font-mono text-[11px] text-[#1C1610]"
                   >
-                    {formatShortDate(period.start_date)} →{" "}
+                    {formatShortDate(period.start_date)} &rarr;{" "}
                     {formatShortDate(period.end_date)} ({period.months}m)
                   </span>
                 ))}
@@ -1272,70 +1421,67 @@ function SectorsWorkspace() {
           </section>
         </div>
 
-        {/* Right Column: AI Macro Analyst Brief Panel (4 cols on XL) */}
-        <aside className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-5 xl:col-span-4">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10">
-                <Sparkles className="h-4 w-4 text-sky-400" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-white">
-                  AI Macro Analyst Brief
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Tool-grounded synthesis for {selectedTicker}
-                </p>
-              </div>
+        {/* Right Column: AI Macro Analyst Brief Panel (4 cols) */}
+        <aside className="ledger-plate flex flex-col p-5 xl:col-span-4">
+          <div className="relative mb-4 flex flex-col items-center">
+            <div className="flex w-full items-center justify-between">
+              <button
+                type="button"
+                onClick={handleRefreshAnalysis}
+                disabled={refreshingBrief || loadingDetail}
+                className="inline-flex items-center gap-1.5 border border-[#2A2118] bg-[#FAF4E6] px-3 py-1 font-display text-xs font-semibold uppercase tracking-wider text-[#1C1610] transition hover:border-[#9E2A2B] hover:text-[#9E2A2B] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`h-3 w-3 ${refreshingBrief ? "animate-spin" : ""}`}
+                />
+                {refreshingBrief ? "Inscribing..." : "Refresh AI Analysis"}
+              </button>
+              <InfoSeal
+                title="AI Macro Analyst Brief"
+                summary="Tool-grounded synthesis referencing get_fiscal_flows, get_rate_regime_history, get_sector_valuation, and get_regime_analogs from SQLite."
+                howToRead="Cached per ticker in SQLite; click Refresh AI Analysis to recompute."
+              />
             </div>
 
-            <button
-              type="button"
-              onClick={handleRefreshAnalysis}
-              disabled={refreshingBrief || loadingDetail}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${refreshingBrief ? "animate-spin" : ""}`}
-              />
-              {refreshingBrief ? "Analyzing..." : "Refresh AI Analysis"}
-            </button>
+            <div className="ledger-title-plate mt-3 px-4 py-1 text-center">
+              <h2 className="font-display text-base font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                Analyst Brief &mdash; {selectedTicker}
+              </h2>
+            </div>
           </div>
 
           {detail?.analyst_brief && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+            <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-[#C8B9A0] pb-2.5 text-[11px]">
               <span
-                className={`rounded-full border px-2 py-0.5 font-medium ${
+                className={`border px-2 py-0.5 font-display font-semibold ${
                   getRegimeStyle(detail.analyst_brief.regime_label).badge
                 }`}
               >
-                Regime: {detail.analyst_brief.regime_label}
+                {detail.analyst_brief.regime_label}
               </span>
               <span
-                className={`rounded-full border px-2 py-0.5 font-medium ${getValuationBadgeStyle(
+                className={`border px-2 py-0.5 font-display font-semibold ${getValuationBadgeStyle(
                   detail.analyst_brief.valuation_zone
                 )}`}
               >
-                Zone: {detail.analyst_brief.valuation_zone}
+                {detail.analyst_brief.valuation_zone}
               </span>
-              <span className="ml-auto font-mono text-slate-500">
-                Updated:{" "}
-                {new Date(detail.analyst_brief.updated_at).toLocaleString()}
+              <span className="ml-auto font-mono text-[#594A3C]">
+                {new Date(detail.analyst_brief.updated_at).toLocaleDateString()}
               </span>
             </div>
           )}
 
-          <div className="mt-4 flex-1 overflow-y-auto rounded-lg border border-slate-800/80 bg-slate-950/60 p-4">
+          <div className="flex-1 overflow-y-auto border border-[#C8B9A0] bg-[#F7F0DF] p-4">
             {loadingDetail ? (
-              <div className="flex h-40 items-center justify-center text-sm text-slate-400">
-                Generating macro analyst brief...
+              <div className="flex h-40 items-center justify-center font-serif text-sm italic text-[#594A3C]">
+                Inscribing analyst brief...
               </div>
             ) : detail?.analyst_brief?.summary_markdown ? (
               <MarkdownBrief markdown={detail.analyst_brief.summary_markdown} />
             ) : (
-              <p className="text-sm text-slate-500">
-                Select a sector or click &ldquo;Refresh AI Analysis&rdquo; to
-                generate a macro capital-flow brief.
+              <p className="font-serif text-sm italic text-[#594A3C]">
+                Select a sector to generate its macro brief.
               </p>
             )}
           </div>
@@ -1345,91 +1491,120 @@ function SectorsWorkspace() {
       {/* Historical Regime Analogs Table */}
       <section
         aria-label="Historical Regime Analogs"
-        className="rounded-xl border border-slate-700/80 bg-slate-900/80 p-5 shadow-lg"
+        className="ledger-plate p-5 sm:p-6"
       >
-        <div className="mb-4 flex flex-col justify-between gap-3 border-b border-slate-800 pb-4 lg:flex-row lg:items-center">
-          <div className="flex items-center gap-2.5">
-            <History className="h-5 w-5 text-sky-400" />
-            <div>
-              <h2 className="text-base font-semibold text-white">
-                Historical Regime Analogs — {selectedTicker}
-              </h2>
-              <p className="text-xs text-slate-400">
-                Deterministic forward 6M &amp; 12M returns across past{" "}
-                <span className="font-semibold text-slate-200">
-                  {detail?.regime_analogs?.current_regime ?? currentRegimeLabel}
-                </span>{" "}
-                rate-regime windows vs. SPY &amp; GLD
-              </p>
+        <div className="relative mb-4 flex flex-col items-center">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 font-mono text-xs tabular-nums">
+              <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-2.5 py-1 text-[#1C1610]">
+                Win Rate:{" "}
+                <strong>
+                  {detail?.regime_analogs?.win_rate_pct !== null &&
+                  detail?.regime_analogs?.win_rate_pct !== undefined ? (
+                    <>
+                      <LedgerCounter
+                        value={detail.regime_analogs.win_rate_pct}
+                        decimals={0}
+                        suffix="%"
+                      />{" "}
+                      ({detail.regime_analogs.win_count}/
+                      {detail.regime_analogs.completed_sample_count})
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </strong>
+              </span>
+              <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-2.5 py-1">
+                6M:{" "}
+                <span
+                  className={formatReturnTextColor(
+                    detail?.regime_analogs?.avg_6m_etf_return_pct
+                  )}
+                >
+                  <LedgerCounter
+                    value={detail?.regime_analogs?.avg_6m_etf_return_pct}
+                    decimals={1}
+                    signed
+                    suffix="%"
+                  />
+                </span>
+              </span>
+              <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-2.5 py-1">
+                12M:{" "}
+                <span
+                  className={formatReturnTextColor(
+                    detail?.regime_analogs?.avg_12m_etf_return_pct
+                  )}
+                >
+                  <LedgerCounter
+                    value={detail?.regime_analogs?.avg_12m_etf_return_pct}
+                    decimals={1}
+                    signed
+                    suffix="%"
+                  />
+                </span>
+              </span>
+              <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-2.5 py-1">
+                vs SPY:{" "}
+                <span
+                  className={formatReturnTextColor(
+                    detail?.regime_analogs?.avg_12m_vs_spy_pct
+                  )}
+                >
+                  <LedgerCounter
+                    value={detail?.regime_analogs?.avg_12m_vs_spy_pct}
+                    decimals={1}
+                    signed
+                    suffix="%"
+                  />
+                </span>
+              </span>
+              <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-2.5 py-1">
+                vs GLD:{" "}
+                <span
+                  className={formatReturnTextColor(
+                    detail?.regime_analogs?.avg_12m_vs_gld_pct
+                  )}
+                >
+                  <LedgerCounter
+                    value={detail?.regime_analogs?.avg_12m_vs_gld_pct}
+                    decimals={1}
+                    signed
+                    suffix="%"
+                  />
+                </span>
+              </span>
             </div>
+
+            <InfoSeal
+              title="Historical Regime Analogs"
+              summary="Deterministically isolates every past contiguous window sharing the current monetary rate regime and computes exact 6M and 12M forward returns for the ETF, ETF vs. SPY, and ETF vs. GLD."
+              howToRead="Rows highlighted with 'Fiscal Match' also shared the current fiscal impulse direction (Accelerating, Neutral, or Contracting)."
+            />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs tabular-nums">
-            <span className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-slate-300">
-              Win Rate:{" "}
-              <strong className="text-white">
-                {detail?.regime_analogs?.win_rate_pct !== null &&
-                detail?.regime_analogs?.win_rate_pct !== undefined
-                  ? `${detail.regime_analogs.win_rate_pct.toFixed(0)}% (${detail.regime_analogs.win_count}/${detail.regime_analogs.completed_sample_count})`
-                  : "—"}
-              </strong>
-            </span>
-            <span className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-slate-300">
-              Avg 6M:{" "}
-              <span
-                className={formatReturnTextColor(
-                  detail?.regime_analogs?.avg_6m_etf_return_pct
-                )}
-              >
-                {formatPct(detail?.regime_analogs?.avg_6m_etf_return_pct)}
-              </span>
-            </span>
-            <span className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-slate-300">
-              Avg 12M:{" "}
-              <span
-                className={formatReturnTextColor(
-                  detail?.regime_analogs?.avg_12m_etf_return_pct
-                )}
-              >
-                {formatPct(detail?.regime_analogs?.avg_12m_etf_return_pct)}
-              </span>
-            </span>
-            <span className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-slate-300">
-              Avg vs SPY:{" "}
-              <span
-                className={formatReturnTextColor(
-                  detail?.regime_analogs?.avg_12m_vs_spy_pct
-                )}
-              >
-                {formatPct(detail?.regime_analogs?.avg_12m_vs_spy_pct)}
-              </span>
-            </span>
-            <span className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-slate-300">
-              Avg vs GLD:{" "}
-              <span
-                className={formatReturnTextColor(
-                  detail?.regime_analogs?.avg_12m_vs_gld_pct
-                )}
-              >
-                {formatPct(detail?.regime_analogs?.avg_12m_vs_gld_pct)}
-              </span>
-            </span>
+          <div className="ledger-title-plate mt-3 px-5 py-1.5 text-center">
+            <h2 className="font-display text-base font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+              Historical Regime Analogs &mdash; {selectedTicker} (
+              {detail?.regime_analogs?.current_regime ?? currentRegimeLabel})
+            </h2>
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-700/80 bg-slate-950/90">
+        <div className="overflow-x-auto border border-[#A8967A] bg-[#FAF4E6]">
           {loadingDetail ? (
-            <div className="p-8 text-center text-sm text-slate-400">
+            <div className="p-8 text-center font-serif text-sm italic text-[#594A3C]">
               Computing historical regime analog returns...
             </div>
           ) : !detail || detail.regime_analogs.analogs.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-400">
+            <div className="p-8 text-center font-serif text-sm italic text-[#594A3C]">
               No matching historical rate-regime windows found yet.
             </div>
           ) : (
-            <table className="w-full min-w-[820px] border-collapse text-left text-xs tabular-nums">
+            <table className="w-full min-w-[820px] border-collapse text-left text-xs font-mono tabular-nums">
               <thead>
-                <tr className="border-b border-slate-700 bg-slate-900 text-[11px] font-semibold uppercase tracking-wider text-slate-200">
+                <tr className="border-b border-[#2A2118] bg-[#EBE0C9] font-display text-[11px] font-bold uppercase tracking-wider text-[#1C1610]">
                   <th className="px-4 py-3">Period</th>
                   <th className="px-4 py-3">Fiscal YoY / Impulse</th>
                   <th className="px-4 py-3 text-right">Fed Funds</th>
@@ -1441,92 +1616,102 @@ function SectorsWorkspace() {
                   <th className="px-4 py-3 text-right">12M vs GLD</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/90">
-                {detail.regime_analogs.analogs.map((analog) => (
-                  <tr
-                    key={`${analog.start_date}-${analog.end_date}`}
-                    className={`transition-colors hover:bg-slate-900/70 ${
-                      analog.matches_fiscal_direction
-                        ? "bg-sky-950/20"
-                        : "bg-slate-950/60"
-                    }`}
-                  >
-                    <td className="px-4 py-3 font-mono text-slate-100">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold">{analog.period}</span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
-                          {analog.months}m
-                        </span>
-                        {analog.matches_fiscal_direction && (
-                          <span className="rounded border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-sky-300">
-                            Fiscal Match
+              <AnimatePresence mode="wait">
+                <motion.tbody
+                  key={`analogs-${selectedTicker}`}
+                  variants={folioStaggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                  exit={{ opacity: 0, transition: { duration: 0.14 } }}
+                  className="divide-y divide-[#D7C9B2]"
+                >
+                  {detail.regime_analogs.analogs.map((analog) => (
+                    <motion.tr
+                      key={`${analog.start_date}-${analog.end_date}`}
+                      variants={folioStaggerItem}
+                      className={`transition-colors hover:bg-[#EFE4CC]/75 ${
+                        analog.matches_fiscal_direction
+                          ? "bg-[#E8F0EB]/60"
+                          : "bg-[#FAF4E6]"
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-[#1C1610]">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">{analog.period}</span>
+                          <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-1.5 py-0.5 text-[10px] text-[#594A3C]">
+                            {analog.months}m
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-semibold text-slate-100">
-                          {formatPct(analog.fiscal_yoy_pct)}
-                        </span>
-                        <span
-                          className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${getImpulseBadgeStyle(
-                            analog.fiscal_impulse_label
-                          )}`}
-                        >
-                          {analog.fiscal_impulse_label} (Z:{" "}
-                          {formatZScore(analog.fiscal_impulse_zscore)})
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-100">
-                      {analog.avg_fed_funds.toFixed(2)}%
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${formatReturnTextColor(
-                        analog.forward_6m_etf_return_pct
-                      )}`}
-                    >
-                      {formatPct(analog.forward_6m_etf_return_pct)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${formatReturnTextColor(
-                        analog.forward_6m_vs_spy_pct
-                      )}`}
-                    >
-                      {formatPct(analog.forward_6m_vs_spy_pct)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${formatReturnTextColor(
-                        analog.forward_6m_vs_gld_pct
-                      )}`}
-                    >
-                      {formatPct(analog.forward_6m_vs_gld_pct)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${formatReturnTextColor(
-                        analog.forward_12m_etf_return_pct
-                      )}`}
-                    >
-                      {formatPct(analog.forward_12m_etf_return_pct)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${formatReturnTextColor(
-                        analog.forward_12m_vs_spy_pct
-                      )}`}
-                    >
-                      {formatPct(analog.forward_12m_vs_spy_pct)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${formatReturnTextColor(
-                        analog.forward_12m_vs_gld_pct
-                      )}`}
-                    >
-                      {formatPct(analog.forward_12m_vs_gld_pct)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+                          {analog.matches_fiscal_direction && (
+                            <span className="border border-[#2B5B6C] bg-[#2B5B6C]/15 px-1.5 py-0.5 font-display text-[10px] font-semibold text-[#1F4452]">
+                              Fiscal Match
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold text-[#1C1610]">
+                            {formatPct(analog.fiscal_yoy_pct)}
+                          </span>
+                          <span
+                            className={`border px-1.5 py-0.5 text-[10px] font-medium ${getImpulseBadgeStyle(
+                              analog.fiscal_impulse_label
+                            )}`}
+                          >
+                            {analog.fiscal_impulse_label} (Z:{" "}
+                            {formatZScore(analog.fiscal_impulse_zscore)})
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-[#1C1610]">
+                        {analog.avg_fed_funds.toFixed(2)}%
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${formatReturnTextColor(
+                          analog.forward_6m_etf_return_pct
+                        )}`}
+                      >
+                        {formatPct(analog.forward_6m_etf_return_pct)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${formatReturnTextColor(
+                          analog.forward_6m_vs_spy_pct
+                        )}`}
+                      >
+                        {formatPct(analog.forward_6m_vs_spy_pct)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${formatReturnTextColor(
+                          analog.forward_6m_vs_gld_pct
+                        )}`}
+                      >
+                        {formatPct(analog.forward_6m_vs_gld_pct)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${formatReturnTextColor(
+                          analog.forward_12m_etf_return_pct
+                        )}`}
+                      >
+                        {formatPct(analog.forward_12m_etf_return_pct)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${formatReturnTextColor(
+                          analog.forward_12m_vs_spy_pct
+                        )}`}
+                      >
+                        {formatPct(analog.forward_12m_vs_spy_pct)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${formatReturnTextColor(
+                          analog.forward_12m_vs_gld_pct
+                        )}`}
+                      >
+                        {formatPct(analog.forward_12m_vs_gld_pct)}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </motion.tbody>
+              </AnimatePresence>
             </table>
           )}
         </div>
@@ -1539,8 +1724,8 @@ export default function SectorsPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto flex min-h-screen max-w-[1440px] items-center justify-center px-4 py-6 text-sm text-slate-400">
-          Loading sector flows workspace...
+        <main className="mx-auto flex min-h-screen max-w-[1440px] items-center justify-center px-4 py-6 font-serif text-sm italic text-[#594A3C]">
+          Opening sector ledger...
         </main>
       }
     >

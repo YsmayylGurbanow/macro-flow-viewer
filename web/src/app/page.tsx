@@ -1,23 +1,27 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  ArrowDown,
   ArrowRight,
   ChevronDown,
   ChevronUp,
-  Coins,
-  Compass,
-  History,
-  Layers,
   RefreshCw,
-  Sparkles,
-  Trophy,
 } from "lucide-react";
+import {
+  folioStaggerContainer,
+  folioStaggerItem,
+} from "@/components/FolioTransitionProvider";
+import { InfoSeal } from "@/components/InfoSeal";
+import { LedgerCounter } from "@/components/LedgerCounter";
 import { MarkdownBrief } from "@/components/MarkdownBrief";
+import { MotionPlate } from "@/components/MotionPlate";
+import { ReactiveAtlasCanvas } from "@/components/ReactiveAtlasCanvas";
 import { API_BASE_URL } from "@/lib/api";
+import { playBrassTick, playInkStamp } from "@/lib/archivalAudio";
 
 interface MacroRateRow {
   date: string;
@@ -88,48 +92,48 @@ interface SecularGoldPreview {
 
 function getTierBadgeStyle(tier: string): string {
   if (tier === "High Conviction") {
-    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+    return "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]";
   }
   if (tier === "Crowded Momentum") {
-    return "border-sky-500/40 bg-sky-500/15 text-sky-300";
+    return "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]";
   }
   if (tier === "Value Trap") {
-    return "border-amber-500/40 bg-amber-500/15 text-amber-200";
+    return "border-[#2B5B6C] bg-[#2B5B6C]/15 text-[#1F4452]";
   }
-  return "border-rose-500/40 bg-rose-500/15 text-rose-300";
+  return "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]";
 }
 
 function getImpulseBadgeStyle(label: string): string {
   if (label === "Accelerating") {
-    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+    return "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]";
   }
   if (label === "Contracting") {
-    return "border-rose-500/40 bg-rose-500/15 text-rose-300";
+    return "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]";
   }
-  return "border-amber-500/40 bg-amber-500/15 text-amber-200";
+  return "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]";
 }
 
 function getRegimeBadgeStyle(regime: string | null | undefined): string {
   if (regime === "Hiking") {
-    return "border-rose-500/40 bg-rose-500/15 text-rose-300";
+    return "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]";
   }
   if (regime === "Cutting") {
-    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+    return "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]";
   }
   if (regime === "High-Pause") {
-    return "border-amber-500/40 bg-amber-500/15 text-amber-300";
+    return "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]";
   }
   if (regime === "Low-Pause") {
-    return "border-sky-500/40 bg-sky-500/15 text-sky-300";
+    return "border-[#2B5B6C] bg-[#2B5B6C]/15 text-[#1F4452]";
   }
-  return "border-slate-700 bg-slate-800 text-slate-300";
+  return "border-[#A8967A] bg-[#FAF4E6] text-[#594A3C]";
 }
 
 function getScoreBarColor(score: number): string {
-  if (score >= 65) return "bg-emerald-400";
-  if (score >= 45) return "bg-sky-400";
-  if (score >= 30) return "bg-amber-400";
-  return "bg-rose-400";
+  if (score >= 65) return "bg-[#4F6D5A]";
+  if (score >= 45) return "bg-[#2B5B6C]";
+  if (score >= 30) return "bg-[#B5892E]";
+  return "bg-[#9E2A2B]";
 }
 
 function formatZScore(z: number | null | undefined): string {
@@ -145,6 +149,7 @@ function formatPct(val: number | null | undefined, signed = true): string {
 
 export default function DecisionEnginePage() {
   const router = useRouter();
+  const portalTimerRef = useRef<number | null>(null);
   const [data, setData] = useState<DecisionsResponse | null>(null);
   const [goldPreview, setGoldPreview] = useState<SecularGoldPreview[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -191,6 +196,7 @@ export default function DecisionEnginePage() {
 
   const handleRefreshRotationBrief = async () => {
     if (refreshingBrief) return;
+    playInkStamp();
     setRefreshingBrief(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/decisions/analyze`, {
@@ -215,154 +221,392 @@ export default function DecisionEnginePage() {
     }
   };
 
+  const scrollToLedger = () => {
+    const target = document.getElementById("conviction-ledger");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (portalTimerRef.current !== null) {
+        window.clearTimeout(portalTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handlePortalRouteDive = (href: string) => {
+    playInkStamp();
+    if (portalTimerRef.current !== null) {
+      window.clearTimeout(portalTimerRef.current);
+    }
+    portalTimerRef.current = window.setTimeout(() => {
+      router.push(href);
+    }, 145);
+  };
+
+  const handlePortalScrollDive = () => {
+    playInkStamp();
+    if (portalTimerRef.current !== null) {
+      window.clearTimeout(portalTimerRef.current);
+    }
+    portalTimerRef.current = window.setTimeout(() => {
+      scrollToLedger();
+    }, 145);
+  };
+
   const currentRegime = data?.current_rate_regime;
-  const topSector = data?.rankings[0] ?? null;
+  const topConviction = data?.rankings[0] ?? null;
+
+  const topFiscalSector = useMemo(() => {
+    if (!data || data.rankings.length === 0) return null;
+    return [...data.rankings].sort(
+      (a, b) =>
+        (b.fiscal_impulse_zscore ?? -99) - (a.fiscal_impulse_zscore ?? -99)
+    )[0];
+  }, [data]);
+
+  const sp500Gold = useMemo(
+    () =>
+      goldPreview.find((item) => item.asset_key === "SP500_GOLD") ??
+      goldPreview[0] ??
+      null,
+    [goldPreview]
+  );
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="flex flex-col justify-between gap-3 border-b border-slate-800/80 pb-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-sky-400">
-            <Compass className="h-4 w-4" />
-            <span>Cross-Sector Capital-Flow Decision Engine</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
-            Sector Conviction Leaderboard &amp; Rotation Brief
-          </h1>
-          <p className="mt-1 text-xs text-slate-400">
-            Deterministic 100-point scoring across Fiscal Impulse (40 pts),
-            Historical Regime Edge (35 pts), and Gold-Relative Margin of Safety
-            (25 pts).
-          </p>
-        </div>
+    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-8 px-4 pb-14 pt-4 sm:px-6 lg:px-8">
+      {/* Full-Viewport Cursor-Reactive Entry Stage */}
+      <section
+        aria-label="PlayFair Capital Atlas Entry"
+        className="relative flex min-h-[calc(100vh-84px)] flex-col justify-between overflow-hidden border border-[#2A2118] bg-[#FAF4E6]/70 p-6 shadow-[inset_0_0_0_3px_#FAF4E6,inset_0_0_0_4px_#A8967A] sm:p-10"
+      >
+        <ReactiveAtlasCanvas />
 
-        <div className="flex flex-wrap items-center gap-2.5 text-xs">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-            <span className="text-slate-400">Rate Regime:</span>
+        {/* Top Archival Plate Index & Monetary Regime Stamp */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[#C8B9A0] pb-3">
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#594A3C]">
+            Folio I &middot; Macro Capital Atlas
+          </span>
+
+          <div className="flex flex-wrap items-center gap-2">
             <span
-              className={`rounded-full border px-2.5 py-0.5 font-semibold ${getRegimeBadgeStyle(
+              className={`border px-2.5 py-0.5 font-display text-xs font-semibold tracking-wide ${getRegimeBadgeStyle(
                 currentRegime?.regime_label
               )}`}
             >
-              {currentRegime?.regime_label ?? "Unavailable"}
+              {currentRegime?.regime_label ?? "Awaiting Telemetry"}
             </span>
-          </div>
-          {currentRegime && (
-            <div className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-1.5 tabular-nums text-slate-300">
-              FF:{" "}
-              <span className="font-semibold text-white">
-                {currentRegime.fed_funds.toFixed(2)}%
-              </span>{" "}
-              | 10Y:{" "}
-              <span className="font-semibold text-white">
+            {currentRegime && (
+              <span className="border border-[#A8967A] bg-[#FAF4E6]/90 px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-[#1C1610]">
+                FF {currentRegime.fed_funds.toFixed(2)}% &middot; 10Y{" "}
                 {currentRegime.dgs10.toFixed(2)}%
               </span>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Error Banner */}
-      {errorMsg && (
-        <div className="flex items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
-          <div>
-            <p className="font-semibold">Backend Connection Issue</p>
-            <p className="mt-0.5 text-xs text-rose-200/80">{errorMsg}</p>
+            )}
           </div>
+        </div>
+
+        {/* Centerpiece Title + Self-Drawing Calligraphic SVG Flourish */}
+        <div className="relative z-10 my-auto flex flex-col items-center py-6 text-center">
+          <span className="font-script text-3xl text-[#9E2A2B] sm:text-4xl">
+            Annals of American Capital
+          </span>
+
+          <h1 className="mt-1 font-display text-4xl font-bold tracking-[0.04em] text-[#1C1610] sm:text-6xl">
+            The Playfair Capital Atlas
+          </h1>
+
+          {/* Animated SVG Ink Calligraphic Flourish */}
+          <svg
+            viewBox="0 0 360 36"
+            className="mt-3 h-7 w-72 overflow-visible sm:w-96"
+            fill="none"
+            aria-hidden="true"
+          >
+            <motion.path
+              d="M 10 18 C 75 4, 125 32, 180 18 C 235 4, 285 32, 350 18"
+              stroke="#2A2118"
+              strokeWidth="1.25"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0.2 }}
+              animate={{ pathLength: 1, opacity: 0.9 }}
+              transition={{ duration: 1.4, ease: "easeInOut" }}
+            />
+            <motion.path
+              d="M 105 18 C 140 8, 160 28, 180 18 C 200 8, 220 28, 255 18"
+              stroke="#B5892E"
+              strokeWidth="1.15"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 0.95 }}
+              transition={{ duration: 1.6, delay: 0.25, ease: "easeInOut" }}
+            />
+            <motion.circle
+              cx="180"
+              cy="18"
+              r="3"
+              fill="#9E2A2B"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, delay: 1.1 }}
+            />
+          </svg>
+
+          {/* 3 Interactive MotionPlate Portal Cards */}
+          <motion.div
+            variants={folioStaggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="mt-8 grid w-full max-w-5xl grid-cols-1 gap-5 text-left md:grid-cols-3"
+          >
+            {/* Portal I: Assets vs. Gold Atlas */}
+            <motion.div variants={folioStaggerItem} className="h-full">
+              <MotionPlate
+                interactive
+                onClick={() => handlePortalRouteDive("/vs-gold")}
+                className="h-full cursor-pointer p-5 transition-shadow hover:shadow-lg"
+              >
+                <div className="flex items-center justify-between border-b border-[#C8B9A0] pb-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#594A3C]">
+                    Plate I &middot; 1970–Present
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-[#9E2A2B]" />
+                </div>
+                <h2 className="mt-3 font-display text-xl font-bold text-[#1C1610]">
+                  Assets vs. Gold Atlas
+                </h2>
+                <div className="mt-4 flex items-baseline justify-between border-t border-dashed border-[#C8B9A0] pt-3 font-mono tabular-nums">
+                  <span className="text-xs uppercase tracking-wider text-[#594A3C]">
+                    {sp500Gold
+                      ? sp500Gold.asset_key.replace("_GOLD", "")
+                      : "SP500"}{" "}
+                    / Gold
+                  </span>
+                  <span className="text-lg font-semibold text-[#7D5C19]">
+                    {sp500Gold ? (
+                      <LedgerCounter
+                        value={sp500Gold.secular_percentile}
+                        decimals={0}
+                        suffix="th %ile"
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                </div>
+              </MotionPlate>
+            </motion.div>
+
+            {/* Portal II: Fiscal & Sector Flows */}
+            <motion.div variants={folioStaggerItem} className="h-full">
+              <MotionPlate
+                interactive
+                onClick={() =>
+                  handlePortalRouteDive(
+                    topFiscalSector
+                      ? `/sectors?ticker=${topFiscalSector.ticker}`
+                      : "/sectors"
+                  )
+                }
+                className="h-full cursor-pointer p-5 transition-shadow hover:shadow-lg"
+              >
+                <div className="flex items-center justify-between border-b border-[#C8B9A0] pb-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#594A3C]">
+                    Plate II &middot; Federal Outlays
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-[#2B5B6C]" />
+                </div>
+                <h2 className="mt-3 font-display text-xl font-bold text-[#1C1610]">
+                  Fiscal &amp; Sector Flows
+                </h2>
+                <div className="mt-4 flex items-baseline justify-between border-t border-dashed border-[#C8B9A0] pt-3 font-mono tabular-nums">
+                  <span className="text-xs uppercase tracking-wider text-[#594A3C]">
+                    #1 Tailwind
+                  </span>
+                  <span className="text-lg font-semibold text-[#2B5B6C]">
+                    {topFiscalSector ? (
+                      <>
+                        {topFiscalSector.ticker} (
+                        <LedgerCounter
+                          value={topFiscalSector.fiscal_impulse_zscore}
+                          decimals={2}
+                          signed
+                          suffix=" Z"
+                        />
+                        )
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                </div>
+              </MotionPlate>
+            </motion.div>
+
+            {/* Portal III: Conviction Ledger (Smooth-scroll) */}
+            <motion.div variants={folioStaggerItem} className="h-full">
+              <MotionPlate
+                interactive
+                onClick={handlePortalScrollDive}
+                className="h-full cursor-pointer p-5 transition-shadow hover:shadow-lg"
+              >
+                <div className="flex items-center justify-between border-b border-[#C8B9A0] pb-2">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#594A3C]">
+                    Plate III &middot; Rankings
+                  </span>
+                  <ArrowDown className="h-4 w-4 text-[#4F6D5A]" />
+                </div>
+                <h2 className="mt-3 font-display text-xl font-bold text-[#1C1610]">
+                  Conviction Ledger
+                </h2>
+                <div className="mt-4 flex items-baseline justify-between border-t border-dashed border-[#C8B9A0] pt-3 font-mono tabular-nums">
+                  <span className="text-xs uppercase tracking-wider text-[#594A3C]">
+                    {topConviction ? `#1 ${topConviction.ticker}` : "Top Rank"}
+                  </span>
+                  <span className="text-lg font-semibold text-[#2F4E3C]">
+                    {topConviction ? (
+                      <LedgerCounter
+                        value={topConviction.conviction_score}
+                        decimals={1}
+                        suffix=" / 100"
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </span>
+                </div>
+              </MotionPlate>
+            </motion.div>
+          </motion.div>
+        </div>
+
+        {/* Bottom Scroll Cue */}
+        <div className="relative z-10 flex justify-center pt-2">
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            onClick={() => {
+              playBrassTick();
+              scrollToLedger();
+            }}
+            className="inline-flex items-center gap-2 border border-[#2A2118] bg-[#FAF4E6] px-4 py-1.5 font-display text-xs font-semibold uppercase tracking-[0.16em] text-[#1C1610] transition hover:border-[#9E2A2B] hover:text-[#9E2A2B]"
+          >
+            <span>Open Decision Ledger</span>
+            <ArrowDown className="h-3.5 w-3.5" />
+          </motion.button>
+        </div>
+      </section>
+
+      {errorMsg && (
+        <div className="flex items-start gap-3 border border-[#9E2A2B] bg-[#FAF4E6] p-4 text-sm text-[#9E2A2B]">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="font-serif">{errorMsg}</p>
         </div>
       )}
 
-      {/* Main Split: Conviction Leaderboard + AI Rotation Brief */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+      {/* Conviction Leaderboard + AI Rotation Brief */}
+      <section
+        id="conviction-ledger"
+        className="grid scroll-mt-16 grid-cols-1 gap-6 xl:grid-cols-12"
+      >
         {/* Leaderboard (7 cols) */}
-        <section
-          aria-label="Conviction Leaderboard"
-          className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 xl:col-span-7"
-        >
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <Trophy className="h-5 w-5 text-amber-400" />
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  #1–#6 Sector Conviction Leaderboard
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Click any sector row to open its full fiscal, rate-regime,
-                  and analog breakdown.
-                </p>
-              </div>
+        <div className="ledger-plate p-5 sm:p-6 xl:col-span-7">
+          <div className="relative mb-5 flex items-center justify-center">
+            <div className="ledger-title-plate px-5 py-1.5 text-center">
+              <h2 className="font-display text-lg font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                Sector Conviction Leaderboard
+              </h2>
             </div>
+            <InfoSeal
+              className="absolute right-0 top-0"
+              title="Sector Conviction Scoring"
+              summary="Ranks all 6 US sector ETFs deterministically from 0 to 100 across three weighted pillars: Fiscal Impulse (0–40 pts from 5Y spending Z-score), Historical Regime Edge (0–35 pts from win rate & 12M excess returns vs. SPY/GLD), and Valuation Margin of Safety (0–25 pts inverted from Gold-relative percentile)."
+              howToRead="High Conviction = Tailwind + Cheap/Fair; Crowded Momentum = Tailwind + Expensive (>75th); Value Trap = Headwind + Cheap (<25th); Avoid = Headwind + Fair/Expensive. Click any row to inspect its sector folio."
+            />
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/80">
+          <div className="overflow-x-auto border border-[#A8967A] bg-[#FAF4E6]">
             {loading ? (
-              <div className="p-8 text-center text-sm text-slate-400">
-                Scoring all 6 sectors...
+              <div className="p-8 text-center font-serif italic text-[#594A3C]">
+                Tabulating sector conviction scores...
               </div>
             ) : !data || data.rankings.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-400">
-                No sector rankings available yet. Run ingestion first.
+              <div className="p-8 text-center font-serif italic text-[#594A3C]">
+                No sector rankings recorded yet.
               </div>
             ) : (
-              <table className="w-full min-w-[680px] border-collapse text-left text-xs tabular-nums">
+              <table className="w-full min-w-[660px] border-collapse text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-                    <th className="px-3.5 py-3">Rank</th>
-                    <th className="px-3.5 py-3">Sector</th>
-                    <th className="px-3.5 py-3">Conviction (F/R/V)</th>
-                    <th className="px-3.5 py-3">Decision Tier</th>
-                    <th className="px-3.5 py-3 text-right">Fiscal Z</th>
-                    <th className="px-3.5 py-3 text-right">Gold %ile</th>
-                    <th className="px-3.5 py-3 text-right">Win Rate</th>
+                  <tr className="border-b border-[#2A2118] bg-[#EBE0C9] font-display text-[11px] font-bold uppercase tracking-wider text-[#1C1610]">
+                    <th className="px-3.5 py-2.5">Rank</th>
+                    <th className="px-3.5 py-2.5">Sector</th>
+                    <th className="px-3.5 py-2.5">Score (F/R/V)</th>
+                    <th className="px-3.5 py-2.5">Quadrant</th>
+                    <th className="px-3.5 py-2.5 text-right">Fiscal Z</th>
+                    <th className="px-3.5 py-2.5 text-right">Gold %ile</th>
+                    <th className="px-3.5 py-2.5 text-right">Win Rate</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80">
+                <motion.tbody
+                  variants={folioStaggerContainer}
+                  initial="hidden"
+                  animate="visible"
+                  className="divide-y divide-[#D7C9B2]"
+                >
                   {data.rankings.map((item) => (
-                    <tr
+                    <motion.tr
                       key={item.ticker}
-                      onClick={() =>
-                        router.push(`/sectors?ticker=${item.ticker}`)
-                      }
-                      className="cursor-pointer transition hover:bg-slate-900/90"
+                      variants={folioStaggerItem}
+                      onClick={() => {
+                        playBrassTick();
+                        router.push(`/sectors?ticker=${item.ticker}`);
+                      }}
+                      className="cursor-pointer transition hover:bg-[#EFE4CC]/75"
                     >
-                      <td className="px-3.5 py-3 font-mono font-bold text-slate-200">
+                      <td className="px-3.5 py-3 font-mono font-semibold text-[#594A3C]">
                         #{item.rank}
                       </td>
                       <td className="px-3.5 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-white">
+                          <span className="font-mono text-sm font-semibold text-[#1C1610]">
                             {item.ticker}
                           </span>
-                          <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                          <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-1.5 py-0.5 font-mono text-[10px] text-[#594A3C]">
                             AG-{item.agency_code}
                           </span>
                         </div>
-                        <span className="block text-[11px] text-slate-400">
+                        <span className="block font-serif text-xs italic text-[#594A3C]">
                           {item.sector_name}
                         </span>
                       </td>
-                      <td className="px-3.5 py-3">
+                      <td className="px-3.5 py-3 font-mono tabular-nums">
                         <div className="flex items-center gap-2">
-                          <span className="w-10 font-bold text-white">
-                            {item.conviction_score.toFixed(1)}
+                          <span className="w-10 font-semibold text-[#1C1610]">
+                            <LedgerCounter value={item.conviction_score} decimals={1} />
                           </span>
-                          <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-800">
-                            <div
-                              className={`h-full rounded-full ${getScoreBarColor(
+                          <div className="h-2 w-24 overflow-hidden border border-[#A8967A] bg-[#F2E8D5]">
+                            <motion.div
+                              className={`h-full ${getScoreBarColor(
                                 item.conviction_score
                               )}`}
-                              style={{
+                              initial={{ width: 0 }}
+                              animate={{
                                 width: `${Math.max(
                                   0,
                                   Math.min(100, item.conviction_score)
                                 )}%`,
                               }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 120,
+                                damping: 20,
+                                delay: 0.1,
+                              }}
                             />
                           </div>
                         </div>
-                        <span className="mt-1 block font-mono text-[10px] text-slate-400">
+                        <span className="mt-1 block text-[10px] text-[#594A3C]">
                           {item.fiscal_score.toFixed(0)}/40 &middot;{" "}
                           {item.regime_edge_score.toFixed(0)}/35 &middot;{" "}
                           {item.valuation_score.toFixed(0)}/25
@@ -370,295 +614,213 @@ export default function DecisionEnginePage() {
                       </td>
                       <td className="px-3.5 py-3">
                         <span
-                          className={`inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${getTierBadgeStyle(
+                          className={`inline-block border px-2 py-0.5 font-display text-[11px] font-semibold ${getTierBadgeStyle(
                             item.decision_tier
                           )}`}
                         >
                           {item.decision_tier}
                         </span>
                       </td>
-                      <td className="px-3.5 py-3 text-right">
+                      <td className="px-3.5 py-3 text-right font-mono tabular-nums">
                         <span
-                          className={`inline-block rounded border px-1.5 py-0.5 font-mono text-[11px] font-semibold ${getImpulseBadgeStyle(
+                          className={`inline-block border px-1.5 py-0.5 text-[11px] font-medium ${getImpulseBadgeStyle(
                             item.fiscal_impulse_label
                           )}`}
                         >
-                          {formatZScore(item.fiscal_impulse_zscore)}
+                          <LedgerCounter
+                            value={item.fiscal_impulse_zscore}
+                            decimals={2}
+                            signed
+                          />
                         </span>
                       </td>
-                      <td className="px-3.5 py-3 text-right font-semibold text-amber-300">
-                        {formatPct(item.gold_valuation_percentile, false)}
+                      <td className="px-3.5 py-3 text-right font-mono font-semibold tabular-nums text-[#7D5C19]">
+                        <LedgerCounter
+                          value={item.gold_valuation_percentile}
+                          decimals={1}
+                          suffix="%"
+                        />
                       </td>
-                      <td className="px-3.5 py-3 text-right font-semibold text-slate-200">
-                        {formatPct(item.win_rate_pct, false)}
+                      <td className="px-3.5 py-3 text-right font-mono font-semibold tabular-nums text-[#1C1610]">
+                        <LedgerCounter
+                          value={item.win_rate_pct}
+                          decimals={1}
+                          suffix="%"
+                        />
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
-                </tbody>
+                </motion.tbody>
               </table>
             )}
           </div>
-        </section>
+        </div>
 
         {/* AI Capital Rotation Brief (5 cols) */}
-        <aside className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-5 xl:col-span-5">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10">
-                <Sparkles className="h-4 w-4 text-sky-400" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  AI Capital Rotation Brief
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Cross-sector positioning synthesized from rankings
-                </p>
-              </div>
+        <aside className="ledger-plate flex flex-col p-5 sm:p-6 xl:col-span-5">
+          <div className="relative mb-4 flex items-center justify-center">
+            <div className="ledger-title-plate px-5 py-1.5 text-center">
+              <h2 className="font-display text-lg font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                Capital Rotation Brief
+              </h2>
+            </div>
+            <InfoSeal
+              className="absolute right-0 top-0"
+              title="AI Capital Rotation Brief"
+              summary="Synthesizes cross-sector rotation positioning grounded exclusively in the deterministic Conviction Rankings and Rate Regime tools stored in SQLite."
+              howToRead="Use 'Refresh Brief' to force a fresh synthesis via the analyst loop (with automatic deterministic offline fallback)."
+            />
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[#C8B9A0] pb-3">
+            <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+              {data?.rotation_brief && (
+                <>
+                  <span className="border border-[#4F6D5A] bg-[#4F6D5A]/15 px-2 py-0.5 font-semibold text-[#2F4E3C]">
+                    TOP: {data.rotation_brief.top_sector}
+                  </span>
+                  <span className="border border-[#9E2A2B] bg-[#9E2A2B]/12 px-2 py-0.5 font-semibold text-[#9E2A2B]">
+                    AVOID: {data.rotation_brief.avoid_sector}
+                  </span>
+                </>
+              )}
             </div>
 
             <button
               type="button"
               onClick={() => void handleRefreshRotationBrief()}
               disabled={refreshingBrief || loading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 border border-[#2A2118] bg-[#FAF4E6] px-3 py-1 font-display text-xs font-semibold uppercase tracking-wider text-[#1C1610] transition hover:border-[#9E2A2B] hover:text-[#9E2A2B] disabled:opacity-50"
             >
               <RefreshCw
-                className={`h-3.5 w-3.5 ${refreshingBrief ? "animate-spin" : ""}`}
+                className={`h-3 w-3 ${refreshingBrief ? "animate-spin" : ""}`}
               />
-              {refreshingBrief ? "Analyzing..." : "Refresh Rotation Brief"}
+              {refreshingBrief ? "Inscribing..." : "Refresh Brief"}
             </button>
           </div>
 
-          {data?.rotation_brief && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 font-semibold text-emerald-300">
-                Top: {data.rotation_brief.top_sector}
-              </span>
-              <span className="rounded-full border border-rose-500/40 bg-rose-500/15 px-2.5 py-0.5 font-semibold text-rose-300">
-                Avoid: {data.rotation_brief.avoid_sector}
-              </span>
-              <span className="ml-auto font-mono text-slate-500">
-                Updated:{" "}
-                {new Date(data.rotation_brief.updated_at).toLocaleString()}
-              </span>
-            </div>
-          )}
-
-          <div className="mt-4 flex-1 overflow-y-auto rounded-lg border border-slate-800/80 bg-slate-950/60 p-4">
+          <div className="flex-1 overflow-y-auto border border-[#C8B9A0] bg-[#F7F0DF] p-4">
             {loading ? (
-              <div className="flex h-40 items-center justify-center text-sm text-slate-400">
-                Loading capital rotation brief...
+              <div className="flex h-36 items-center justify-center font-serif italic text-[#594A3C]">
+                Preparing rotation memorandum...
               </div>
             ) : data?.rotation_brief?.summary_markdown ? (
               <MarkdownBrief markdown={data.rotation_brief.summary_markdown} />
             ) : (
-              <p className="text-sm text-slate-500">
-                Click &ldquo;Refresh Rotation Brief&rdquo; to generate a
-                cross-sector capital allocation brief.
+              <p className="font-serif italic text-[#594A3C]">
+                No rotation brief available yet.
               </p>
             )}
           </div>
         </aside>
-      </div>
-
-      {/* Compact Quick Preview Cards into /vs-gold and /sectors */}
-      <section
-        aria-label="Panel Shortcuts"
-        className="grid grid-cols-1 gap-4 md:grid-cols-2"
-      >
-        <Link
-          href="/vs-gold"
-          className="group flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-5 transition hover:border-amber-500/50 hover:bg-slate-900/90"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10">
-                <Coins className="h-4 w-4 text-amber-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">
-                  Assets vs. Gold (55-Year Secular Panel)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  USD, GBP, Fed Funds Cash, S&amp;P 500, Nasdaq &amp; US Houses
-                  in oz of Gold
-                </p>
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-amber-300" />
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 text-[11px] tabular-nums">
-            {goldPreview.length > 0 ? (
-              goldPreview.slice(0, 4).map((asset) => (
-                <span
-                  key={asset.asset_key}
-                  className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-slate-300"
-                >
-                  {asset.asset_key.replace("_GOLD", "")}:{" "}
-                  <strong className="text-amber-300">
-                    {asset.secular_percentile.toFixed(0)}%
-                  </strong>{" "}
-                  ({asset.valuation_zone})
-                </span>
-              ))
-            ) : (
-              <span className="text-slate-400">
-                Inspect 10Y / 25Y / 55Y secular charts and all-time Gold highs
-                &amp; lows.
-              </span>
-            )}
-          </div>
-        </Link>
-
-        <Link
-          href={
-            topSector ? `/sectors?ticker=${topSector.ticker}` : "/sectors"
-          }
-          className="group flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-5 transition hover:border-sky-500/50 hover:bg-slate-900/90"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sky-500/30 bg-sky-500/10">
-                <Layers className="h-4 w-4 text-sky-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">
-                  Fiscal &amp; Sector Flows Panel
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Deep-dive into agency outlays, Z-scores, rate bands &amp;
-                  historical analogs
-                </p>
-              </div>
-            </div>
-            <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-sky-300" />
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] tabular-nums">
-            {topSector ? (
-              <>
-                <span className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 font-semibold text-sky-300">
-                  Leader: {topSector.ticker} ({topSector.sector_name})
-                </span>
-                <span className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-slate-300">
-                  Score:{" "}
-                  <strong className="text-white">
-                    {topSector.conviction_score.toFixed(1)}/100
-                  </strong>
-                </span>
-                <span className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-slate-300">
-                  12M vs SPY:{" "}
-                  <strong className="text-emerald-400">
-                    {formatPct(topSector.avg_12m_vs_spy_pct)}
-                  </strong>
-                </span>
-              </>
-            ) : (
-              <span className="text-slate-400">
-                Explore all 6 US sector ETFs and export X/Telegram macro briefs.
-              </span>
-            )}
-          </div>
-        </Link>
       </section>
 
       {/* Collapsible Signal History Log */}
-      <section
-        aria-label="Signal History Log"
-        className="rounded-xl border border-slate-800 bg-slate-900/60"
-      >
-        <button
-          type="button"
-          onClick={() => setHistoryOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-slate-900/90"
-        >
-          <div className="flex items-center gap-2.5">
-            <History className="h-4 w-4 text-sky-400" />
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Signal History Log ({data?.signal_snapshots.length ?? 0}{" "}
-                snapshots)
-              </h2>
-              <p className="text-xs text-slate-400">
-                Historical daily rankings persisted to{" "}
-                <code className="font-mono text-sky-300">signal_snapshots</code>{" "}
-                on ingestion
-              </p>
+      <section aria-label="Signal History Log" className="ledger-plate p-5">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              playBrassTick();
+              setHistoryOpen((prev) => !prev);
+            }}
+            className="flex flex-1 items-center justify-between text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="font-display text-base font-bold uppercase tracking-[0.12em] text-[#1C1610]">
+                Signal History Archive
+              </span>
+              <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-2 py-0.5 font-mono text-[11px] tabular-nums text-[#594A3C]">
+                {data?.signal_snapshots.length ?? 0} entries
+              </span>
             </div>
-          </div>
-          {historyOpen ? (
-            <ChevronUp className="h-4 w-4 text-slate-400" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-slate-400" />
-          )}
-        </button>
-
-        {historyOpen && (
-          <div className="border-t border-slate-800 p-4">
-            {!data || data.signal_snapshots.length === 0 ? (
-              <p className="text-xs text-slate-400">
-                No signal snapshots recorded yet. Run ingestion to log rankings.
-              </p>
+            {historyOpen ? (
+              <ChevronUp className="h-4 w-4 text-[#594A3C]" />
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/80">
-                <table className="w-full min-w-[640px] border-collapse text-left text-xs tabular-nums">
-                  <thead>
-                    <tr className="border-b border-slate-800 bg-slate-900 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-                      <th className="px-3.5 py-2.5">Date</th>
-                      <th className="px-3.5 py-2.5">Ticker</th>
-                      <th className="px-3.5 py-2.5 text-right">Score</th>
-                      <th className="px-3.5 py-2.5">Tier</th>
-                      <th className="px-3.5 py-2.5 text-right">Fiscal Z</th>
-                      <th className="px-3.5 py-2.5">Regime</th>
-                      <th className="px-3.5 py-2.5 text-right">Gold %ile</th>
-                      <th className="px-3.5 py-2.5 text-right">ETF Close</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {data.signal_snapshots.map((snap) => (
-                      <tr key={snap.id} className="hover:bg-slate-900/60">
-                        <td className="px-3.5 py-2 font-mono text-slate-300">
-                          {snap.snapshot_date}
-                        </td>
-                        <td className="px-3.5 py-2 font-bold text-white">
-                          {snap.ticker}
-                        </td>
-                        <td className="px-3.5 py-2 text-right font-semibold text-white">
-                          {snap.conviction_score.toFixed(1)}
-                        </td>
-                        <td className="px-3.5 py-2">
-                          <span
-                            className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getTierBadgeStyle(
-                              snap.decision_tier
-                            )}`}
-                          >
-                            {snap.decision_tier}
-                          </span>
-                        </td>
-                        <td className="px-3.5 py-2 text-right font-mono text-slate-200">
-                          {formatZScore(snap.fiscal_impulse_zscore)}
-                        </td>
-                        <td className="px-3.5 py-2 text-slate-300">
-                          {snap.regime_label}
-                        </td>
-                        <td className="px-3.5 py-2 text-right text-amber-300">
-                          {formatPct(snap.gold_valuation_percentile, false)}
-                        </td>
-                        <td className="px-3.5 py-2 text-right text-slate-200">
-                          {snap.etf_close !== null
-                            ? `$${snap.etf_close.toFixed(2)}`
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ChevronDown className="h-4 w-4 text-[#594A3C]" />
             )}
-          </div>
-        )}
+          </button>
+
+          <InfoSeal
+            className="ml-3"
+            title="Signal History Archive"
+            summary="Immutable daily audit trail of deterministic Conviction Scores, quadrants, fiscal Z-scores, and ETF prices recorded during each data ingestion cycle."
+          />
+        </div>
+
+        <AnimatePresence initial={false}>
+          {historyOpen && (
+            <motion.div
+              key="signal-history-panel"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="mt-4 overflow-x-auto border border-[#A8967A] bg-[#FAF4E6]">
+                {!data || data.signal_snapshots.length === 0 ? (
+                  <p className="p-4 font-serif text-sm italic text-[#594A3C]">
+                    No signal snapshots recorded yet.
+                  </p>
+                ) : (
+                  <table className="w-full min-w-[640px] border-collapse text-left text-xs font-mono tabular-nums">
+                    <thead>
+                      <tr className="border-b border-[#2A2118] bg-[#EBE0C9] font-display text-[11px] font-bold uppercase tracking-wider text-[#1C1610]">
+                        <th className="px-3.5 py-2.5">Date</th>
+                        <th className="px-3.5 py-2.5">Ticker</th>
+                        <th className="px-3.5 py-2.5 text-right">Score</th>
+                        <th className="px-3.5 py-2.5">Tier</th>
+                        <th className="px-3.5 py-2.5 text-right">Fiscal Z</th>
+                        <th className="px-3.5 py-2.5">Regime</th>
+                        <th className="px-3.5 py-2.5 text-right">Gold %ile</th>
+                        <th className="px-3.5 py-2.5 text-right">ETF Close</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#D7C9B2]">
+                      {data.signal_snapshots.map((snap) => (
+                        <tr key={snap.id} className="hover:bg-[#EFE4CC]/60">
+                          <td className="px-3.5 py-2 text-[#594A3C]">
+                            {snap.snapshot_date}
+                          </td>
+                          <td className="px-3.5 py-2 font-semibold text-[#1C1610]">
+                            {snap.ticker}
+                          </td>
+                          <td className="px-3.5 py-2 text-right font-semibold text-[#1C1610]">
+                            {snap.conviction_score.toFixed(1)}
+                          </td>
+                          <td className="px-3.5 py-2">
+                            <span
+                              className={`inline-block border px-2 py-0.5 font-display text-[10px] font-semibold ${getTierBadgeStyle(
+                                snap.decision_tier
+                              )}`}
+                            >
+                              {snap.decision_tier}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2 text-right text-[#1C1610]">
+                            {formatZScore(snap.fiscal_impulse_zscore)}
+                          </td>
+                          <td className="px-3.5 py-2 font-serif text-xs text-[#594A3C]">
+                            {snap.regime_label}
+                          </td>
+                          <td className="px-3.5 py-2 text-right text-[#7D5C19]">
+                            {formatPct(snap.gold_valuation_percentile, false)}
+                          </td>
+                          <td className="px-3.5 py-2 text-right text-[#1C1610]">
+                            {snap.etf_close !== null
+                              ? `$${snap.etf_close.toFixed(2)}`
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
     </main>
   );

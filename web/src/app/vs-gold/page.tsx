@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Coins, RefreshCw } from "lucide-react";
+import { motion } from "framer-motion";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -12,7 +13,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  folioStaggerContainer,
+  folioStaggerItem,
+} from "@/components/FolioTransitionProvider";
+import { InfoSeal } from "@/components/InfoSeal";
+import { LedgerCounter } from "@/components/LedgerCounter";
+import { MotionPlate } from "@/components/MotionPlate";
 import { API_BASE_URL } from "@/lib/api";
+import { playBrassTick } from "@/lib/archivalAudio";
 
 interface SecularExtreme {
   ratio: number;
@@ -48,31 +57,70 @@ const TIMEFRAME_YEARS: Record<TimeframeKey, number> = {
   "55Y": 55,
 };
 
-const ASSET_ACCENTS: Record<string, { stroke: string; fill: string }> = {
-  USD_GOLD: { stroke: "#38bdf8", fill: "#38bdf8" },
-  GBP_GOLD: { stroke: "#a855f7", fill: "#a855f7" },
-  CASH_FUND_GOLD: { stroke: "#10b981", fill: "#10b981" },
-  SP500_GOLD: { stroke: "#f59e0b", fill: "#f59e0b" },
-  NASDAQ_GOLD: { stroke: "#ec4899", fill: "#ec4899" },
-  HOUSING_GOLD: { stroke: "#eab308", fill: "#eab308" },
+const ASSET_INKS: Record<string, { stroke: string; wash: string }> = {
+  USD_GOLD: { stroke: "#1C1610", wash: "#594A3C" },
+  GBP_GOLD: { stroke: "#2B5B6C", wash: "#2B5B6C" },
+  CASH_FUND_GOLD: { stroke: "#4F6D5A", wash: "#4F6D5A" },
+  SP500_GOLD: { stroke: "#9E2A2B", wash: "#9E2A2B" },
+  NASDAQ_GOLD: { stroke: "#B5892E", wash: "#B5892E" },
+  HOUSING_GOLD: { stroke: "#594A3C", wash: "#B5892E" },
+};
+
+const ASSET_INFO: Record<string, { summary: string; howToRead: string }> = {
+  USD_GOLD: {
+    summary:
+      "Tracks the purchasing power of $1,000 USD denominated in troy ounces of physical Gold from 1970 to present.",
+    howToRead:
+      "Lower readings indicate fiat purchasing-power erosion relative to Gold; <25th percentile marks secular Gold-cheap USD.",
+  },
+  GBP_GOLD: {
+    summary:
+      "Converts £1,000 GBP into USD via FRED DEXUSUK (1971–present) and prices that sum in troy ounces of Gold.",
+    howToRead:
+      "Measures Sterling's hard-money purchasing power across five decades of monetary regimes.",
+  },
+  CASH_FUND_GOLD: {
+    summary:
+      "Compounds $1,000 monthly at the Federal Funds rate (FRED FEDFUNDS) since Jan 1970, then divides by Gold USD.",
+    howToRead:
+      "Shows whether short-term interest income outpaced or trailed Gold debasement across tightening and easing cycles.",
+  },
+  SP500_GOLD: {
+    summary:
+      "Prices the S&P 500 index (^GSPC, 1970–present) in troy ounces of Gold rather than nominal Dollars.",
+    howToRead:
+      "Peaks mark secular equity euphoria vs. hard assets; troughs (<25th percentile) historically preceded equity outperformance.",
+  },
+  NASDAQ_GOLD: {
+    summary:
+      "Splices Nasdaq Composite (^IXIC, 1971–1985) smoothly onto Nasdaq-100 (^NDX, 1985–present) divided by Gold USD.",
+    howToRead:
+      "Highlights long-duration growth multiples deflated by Gold across 2000, 2008, and modern cycles.",
+  },
+  HOUSING_GOLD: {
+    summary:
+      "Divides FRED quarterly Median Sales Price of US Houses Sold (MSPUS, 1970–present) by the matching month's Gold price.",
+    howToRead:
+      "Directly reads how many troy ounces of Gold are required to purchase one median US home.",
+  },
 };
 
 function getGoldValuationBadge(zone: string): { label: string; cls: string } {
   if (zone === "Cheap") {
     return {
       label: "Cheap in Gold",
-      cls: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
+      cls: "border-[#4F6D5A] bg-[#4F6D5A]/15 text-[#2F4E3C]",
     };
   }
   if (zone === "Expensive") {
     return {
       label: "Expensive in Gold",
-      cls: "border-rose-500/40 bg-rose-500/15 text-rose-300",
+      cls: "border-[#9E2A2B] bg-[#9E2A2B]/12 text-[#9E2A2B]",
     };
   }
   return {
     label: "Normal in Gold",
-    cls: "border-amber-500/40 bg-amber-500/15 text-amber-200",
+    cls: "border-[#B5892E] bg-[#B5892E]/15 text-[#7D5C19]",
   };
 }
 
@@ -81,6 +129,13 @@ function formatRatio(val: number): string {
   if (Math.abs(val) >= 100) return val.toFixed(1);
   if (Math.abs(val) >= 10) return val.toFixed(2);
   return val.toFixed(3);
+}
+
+function getRatioDecimals(val: number | null | undefined): number {
+  if (typeof val !== "number" || !Number.isFinite(val)) return 2;
+  if (Math.abs(val) >= 100) return 1;
+  if (Math.abs(val) >= 10) return 2;
+  return 3;
 }
 
 function formatUsd(val: number): string {
@@ -124,26 +179,26 @@ function SecularGoldTooltip({ active, payload, unitLabel }: TooltipProps) {
   if (!pt) return null;
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/95 p-3 text-xs shadow-xl backdrop-blur">
-      <div className="mb-1.5 border-b border-slate-800 pb-1 font-semibold text-white">
+    <div className="border border-[#2A2118] bg-[#FAF4E6] p-3 text-xs text-[#1C1610] shadow-[inset_0_0_0_2px_#FAF4E6,inset_0_0_0_3px_#A8967A,0_10px_20px_-8px_rgba(28,22,16,0.3)]">
+      <div className="mb-1.5 border-b border-[#C8B9A0] pb-1 font-mono font-semibold text-[#1C1610]">
         {formatShortDate(pt.date)}
       </div>
-      <div className="space-y-1 tabular-nums">
+      <div className="space-y-1 font-mono tabular-nums">
         <div className="flex justify-between gap-4">
-          <span className="text-amber-300">Gold Ratio:</span>
-          <span className="font-semibold text-white">
+          <span className="font-serif italic text-[#594A3C]">Gold Ratio:</span>
+          <span className="font-semibold text-[#7D5C19]">
             {formatRatio(pt.ratio_in_gold)} ({unitLabel})
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-sky-300">Asset (USD):</span>
-          <span className="font-medium text-slate-200">
+          <span className="font-serif italic text-[#594A3C]">Asset (USD):</span>
+          <span className="font-medium text-[#1C1610]">
             {formatUsd(pt.asset_value_usd)}
           </span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-yellow-300">Gold Spot (USD/oz):</span>
-          <span className="font-medium text-slate-200">
+          <span className="font-serif italic text-[#594A3C]">Gold Spot:</span>
+          <span className="font-medium text-[#1C1610]">
             {formatUsd(pt.gold_price_usd)}
           </span>
         </div>
@@ -165,43 +220,55 @@ function SecularAssetCard({
   );
 
   const badge = getGoldValuationBadge(asset.valuation_zone);
-  const accent = ASSET_ACCENTS[asset.asset_key] ?? {
-    stroke: "#38bdf8",
-    fill: "#38bdf8",
+  const ink = ASSET_INKS[asset.asset_key] ?? {
+    stroke: "#2B5B6C",
+    wash: "#2B5B6C",
   };
-  const gradientId = `gold-grad-${asset.asset_key}`;
+  const info = ASSET_INFO[asset.asset_key] ?? {
+    summary: `Monthly secular series of ${asset.asset_name} priced in troy ounces of Gold.`,
+    howToRead: `50Y dashed mean sits at ${formatRatio(asset.mean_ratio)} oz.`,
+  };
+  const gradientId = `playfair-wash-${asset.asset_key}`;
 
   return (
-    <article className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-white">
-              {asset.asset_name}
-            </h2>
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-slate-400">
-              {asset.asset_key}
+    <MotionPlate className="flex flex-col p-5">
+      {/* Top Plate Header + Centered Title Box + Top-Right InfoSeal */}
+      <div className="relative flex flex-col items-center pb-3">
+        <div className="flex w-full items-center justify-between">
+          <span className="border border-[#C8B9A0] bg-[#F2E8D5] px-1.5 py-0.5 font-mono text-[10px] text-[#594A3C]">
+            {asset.asset_key}
+          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`border px-2 py-0.5 font-display text-[11px] font-semibold ${badge.cls}`}
+            >
+              {badge.label}
             </span>
+            <InfoSeal
+              title={asset.asset_name}
+              summary={info.summary}
+              howToRead={info.howToRead}
+            />
           </div>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Unit: <span className="text-slate-300">{asset.unit_label}</span>{" "}
-            &middot; Mean:{" "}
-            <span className="font-mono text-amber-300">
+        </div>
+
+        <div className="ledger-title-plate mt-3 px-4 py-1.5 text-center">
+          <h2 className="font-display text-lg font-bold tracking-wide text-[#1C1610]">
+            {asset.asset_name}
+          </h2>
+          <p className="font-serif text-[11px] italic text-[#594A3C]">
+            {asset.unit_label} &middot; 50Y Mean{" "}
+            <span className="font-mono not-italic text-[#7D5C19]">
               {formatRatio(asset.mean_ratio)} oz
             </span>
           </p>
         </div>
-
-        <span
-          className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${badge.cls}`}
-        >
-          {badge.label}
-        </span>
       </div>
 
-      <div className="mt-4 h-[240px] w-full">
+      {/* Millimeter Paper Recharts Plot */}
+      <div className="millimeter-paper h-[240px] w-full p-2">
         {filteredSeries.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-xs text-slate-500">
+          <div className="flex h-full items-center justify-center font-serif text-xs italic text-[#594A3C]">
             No observations inside selected timeframe.
           </div>
         ) : (
@@ -212,96 +279,117 @@ function SecularAssetCard({
             >
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="5%"
-                    stopColor={accent.fill}
-                    stopOpacity={0.35}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor={accent.fill}
-                    stopOpacity={0.02}
-                  />
+                  <stop offset="5%" stopColor={ink.wash} stopOpacity={0.28} />
+                  <stop offset="95%" stopColor={ink.wash} stopOpacity={0.03} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+              <CartesianGrid stroke="#C8B9A0" strokeDasharray="2 3" />
               <XAxis
                 dataKey="date"
                 tickFormatter={(d: string) => d.slice(0, 4)}
-                stroke="#64748b"
-                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                stroke="#594A3C"
+                tick={{
+                  fill: "#594A3C",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                }}
                 minTickGap={34}
               />
               <YAxis
-                stroke="#94a3b8"
-                tick={{ fill: "#94a3b8", fontSize: 11 }}
+                stroke="#594A3C"
+                tick={{
+                  fill: "#594A3C",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                }}
                 tickFormatter={(v: number) => formatRatio(v)}
                 width={52}
                 domain={["auto", "auto"]}
               />
               <Tooltip
+                cursor={{ stroke: "#9E2A2B", strokeDasharray: "3 3" }}
                 content={<SecularGoldTooltip unitLabel={asset.unit_label} />}
               />
               <ReferenceLine
                 y={asset.mean_ratio}
-                stroke="#f59e0b"
+                stroke="#B5892E"
                 strokeDasharray="5 4"
+                strokeWidth={1.5}
                 label={{
                   value: "50Y Mean",
                   position: "insideTopRight",
-                  fill: "#fbbf24",
+                  fill: "#7D5C19",
                   fontSize: 10,
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="ratio_in_gold"
-                stroke={accent.stroke}
+                stroke={ink.stroke}
                 strokeWidth={2}
                 fill={`url(#${gradientId})`}
                 dot={false}
-                isAnimationActive={false}
+                isAnimationActive={true}
+                animationDuration={620}
+                animationEasing="ease-out"
               />
             </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 border-t border-slate-800/80 pt-3 text-xs tabular-nums sm:grid-cols-4">
-        <div className="rounded-lg bg-slate-950/60 p-2.5">
-          <span className="block text-[11px] text-slate-500">
-            Latest Ratio ({formatShortDate(asset.latest_date)})
+      {/* Clean 4-Cell Tabular Stat Footer */}
+      <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-[#C8B9A0] pt-3 text-xs font-mono tabular-nums sm:grid-cols-4">
+        <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2">
+          <span className="block font-serif text-[11px] italic text-[#594A3C]">
+            Latest ({formatShortDate(asset.latest_date)})
           </span>
-          <span className="text-sm font-semibold text-white">
-            {formatRatio(asset.latest_ratio)} oz
-          </span>
-        </div>
-        <div className="rounded-lg bg-slate-950/60 p-2.5">
-          <span className="block text-[11px] text-slate-500">
-            Secular Percentile
-          </span>
-          <span className="text-sm font-semibold text-sky-300">
-            {asset.secular_percentile.toFixed(1)}%
+          <span className="text-sm font-semibold text-[#1C1610]">
+            <LedgerCounter
+              value={asset.latest_ratio}
+              decimals={getRatioDecimals(asset.latest_ratio)}
+              suffix=" oz"
+            />
           </span>
         </div>
-        <div className="rounded-lg bg-slate-950/60 p-2.5">
-          <span className="block text-[11px] text-slate-500">
-            All-Time High ({formatShortDate(asset.max_ratio.date)})
+        <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2">
+          <span className="block font-serif text-[11px] italic text-[#594A3C]">
+            Secular %ile
           </span>
-          <span className="text-sm font-semibold text-emerald-400">
-            {formatRatio(asset.max_ratio.ratio)} oz
+          <span className="text-sm font-semibold text-[#2B5B6C]">
+            <LedgerCounter
+              value={asset.secular_percentile}
+              decimals={1}
+              suffix="%"
+            />
           </span>
         </div>
-        <div className="rounded-lg bg-slate-950/60 p-2.5">
-          <span className="block text-[11px] text-slate-500">
-            All-Time Low ({formatShortDate(asset.min_ratio.date)})
+        <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2">
+          <span className="block font-serif text-[11px] italic text-[#594A3C]">
+            ATH ({formatShortDate(asset.max_ratio.date)})
           </span>
-          <span className="text-sm font-semibold text-rose-400">
-            {formatRatio(asset.min_ratio.ratio)} oz
+          <span className="text-sm font-semibold text-[#2F4E3C]">
+            <LedgerCounter
+              value={asset.max_ratio.ratio}
+              decimals={getRatioDecimals(asset.max_ratio.ratio)}
+              suffix=" oz"
+            />
+          </span>
+        </div>
+        <div className="border border-[#D7C9B2] bg-[#F2E8D5]/70 p-2">
+          <span className="block font-serif text-[11px] italic text-[#594A3C]">
+            ATL ({formatShortDate(asset.min_ratio.date)})
+          </span>
+          <span className="text-sm font-semibold text-[#9E2A2B]">
+            <LedgerCounter
+              value={asset.min_ratio.ratio}
+              decimals={getRatioDecimals(asset.min_ratio.ratio)}
+              suffix=" oz"
+            />
           </span>
         </div>
       </div>
-    </article>
+    </MotionPlate>
   );
 }
 
@@ -339,27 +427,23 @@ export default function AssetsVsGoldPage() {
   }, [loadAssets]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-col justify-between gap-4 border-b border-slate-800/80 pb-4 sm:flex-row sm:items-center">
+    <main className="mx-auto flex min-h-screen max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      {/* Slim Archival Masthead */}
+      <header className="flex flex-col justify-between gap-4 border-b border-[#2A2118] pb-4 sm:flex-row sm:items-end">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-400">
-            <Coins className="h-4 w-4" />
-            <span>55-Year Secular Valuation (1970–Present)</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
+          <span className="font-script text-2xl text-[#9E2A2B]">
+            Folio II &middot; Secular Hard-Money Atlas
+          </span>
+          <h1 className="font-display text-3xl font-bold tracking-wide text-[#1C1610]">
             Macro Assets Priced in Gold
           </h1>
-          <p className="mt-1 text-xs text-slate-400">
-            Each asset renders in its own isolated panel against a 1970–present
-            Gold troy ounce denominator with a 50Y secular mean reference line.
-          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div
             role="group"
             aria-label="Timeframe Selector"
-            className="inline-flex rounded-lg border border-slate-800 bg-slate-900/80 p-1 text-xs"
+            className="inline-flex border border-[#2A2118] bg-[#FAF4E6] p-0.5 font-mono text-xs"
           >
             {(
               [
@@ -367,78 +451,104 @@ export default function AssetsVsGoldPage() {
                 { key: "25Y", label: "25Y" },
                 { key: "55Y", label: "55Y (Max)" },
               ] as const
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTimeframe(key)}
-                className={`rounded-md px-3 py-1.5 font-semibold transition ${
-                  timeframe === key
-                    ? "bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40"
-                    : "text-slate-400 hover:text-slate-100"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+            ).map(({ key, label }) => {
+              const active = timeframe === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (timeframe !== key) {
+                      playBrassTick();
+                      setTimeframe(key);
+                    }
+                  }}
+                  className={`relative px-3 py-1 font-semibold transition-colors ${
+                    active
+                      ? "text-[#FAF4E6]"
+                      : "text-[#594A3C] hover:text-[#1C1610]"
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="vs-gold-timeframe-pill"
+                      transition={{
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 32,
+                      }}
+                      className="absolute inset-0 bg-[#1C1610]"
+                    />
+                  )}
+                  <span className="relative z-10">{label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <button
             type="button"
-            onClick={() => void loadAssets()}
+            onClick={() => {
+              playBrassTick();
+              void loadAssets();
+            }}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 border border-[#2A2118] bg-[#FAF4E6] px-3 py-1.5 font-display text-xs font-semibold uppercase tracking-wider text-[#1C1610] transition hover:border-[#9E2A2B] hover:text-[#9E2A2B] disabled:opacity-50"
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+              className={`h-3 w-3 ${loading ? "animate-spin" : ""}`}
             />
             Reload
           </button>
+
+          <InfoSeal
+            title="1970–Present Gold Denominator"
+            summary="Constructs a continuous 55-year monthly Gold USD benchmark (Stooq xauusd spliced with embedded 1970–2004 London Fix baseline and Yahoo GC=F) to measure purchasing power independent of fiat debasement."
+            howToRead="Each chart displays one asset in isolation against a 50-year dashed mean. Below the 25th percentile is Cheap in Gold; above the 75th percentile is Expensive in Gold."
+          />
         </div>
       </header>
 
       {errorMsg && (
-        <div className="flex items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
-          <div>
-            <p className="font-semibold">Backend Connection Issue</p>
-            <p className="mt-0.5 text-xs text-rose-200/80">{errorMsg}</p>
-          </div>
+        <div className="flex items-start gap-3 border border-[#9E2A2B] bg-[#FAF4E6] p-4 text-sm text-[#9E2A2B]">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="font-serif">{errorMsg}</p>
         </div>
       )}
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {[1, 2, 3, 4, 5, 6].map((slot) => (
             <div
               key={slot}
-              className="flex h-[360px] items-center justify-center rounded-xl border border-slate-800 bg-slate-900/40 text-sm text-slate-400"
+              className="ledger-plate flex h-[380px] items-center justify-center font-serif text-sm italic text-[#594A3C]"
             >
-              Loading 55-year secular Gold series...
+              Drawing archival plate...
             </div>
           ))}
         </div>
       ) : assets.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-10 text-center text-sm text-slate-400">
+        <div className="ledger-plate p-10 text-center font-serif text-sm italic text-[#594A3C]">
           No secular Gold series persisted yet. Run{" "}
-          <code className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-sky-300">
+          <code className="border border-[#C8B9A0] bg-[#EFE4CC] px-1.5 py-0.5 font-mono text-xs text-[#2B5B6C]">
             cargo run -- --ingest
           </code>{" "}
           to populate <code className="font-mono">gold_secular_ratios</code>.
         </div>
       ) : (
-        <section
+        <motion.section
+          variants={folioStaggerContainer}
+          initial="hidden"
+          animate="visible"
           aria-label="Assets vs Gold Cards"
-          className="grid grid-cols-1 gap-5 lg:grid-cols-2"
+          className="grid grid-cols-1 gap-6 lg:grid-cols-2"
         >
           {assets.map((asset) => (
-            <SecularAssetCard
-              key={asset.asset_key}
-              asset={asset}
-              timeframe={timeframe}
-            />
+            <motion.div key={asset.asset_key} variants={folioStaggerItem}>
+              <SecularAssetCard asset={asset} timeframe={timeframe} />
+            </motion.div>
           ))}
-        </section>
+        </motion.section>
       )}
     </main>
   );

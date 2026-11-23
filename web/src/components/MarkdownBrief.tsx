@@ -5,7 +5,7 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
   return parts.map((segment, index) => {
     if (segment.startsWith("**") && segment.endsWith("**")) {
       return (
-        <strong key={index} className="font-semibold text-slate-100">
+        <strong key={index} className="font-semibold text-[#1C1610]">
           {segment.slice(2, -2)}
         </strong>
       );
@@ -14,7 +14,7 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
       return (
         <code
           key={index}
-          className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-sky-300"
+          className="rounded-sm border border-[#C8B9A0] bg-[#EFE4CC] px-1.5 py-0.5 font-mono text-xs text-[#2B5B6C]"
         >
           {segment.slice(1, -1)}
         </code>
@@ -28,7 +28,7 @@ export function MarkdownBrief({ markdown }: { markdown: string }) {
   const lines = markdown.split(/\r?\n/);
 
   return (
-    <div className="space-y-2.5 text-sm leading-relaxed text-slate-300">
+    <div className="space-y-2.5 font-serif text-[15px] leading-relaxed text-[#1C1610]">
       {lines.map((rawLine, idx) => {
         const line = rawLine.trim();
         if (!line) {
@@ -38,7 +38,7 @@ export function MarkdownBrief({ markdown }: { markdown: string }) {
           return (
             <h3
               key={idx}
-              className="border-b border-slate-800 pb-1.5 text-base font-semibold text-white"
+              className="border-b border-[#C8B9A0] pb-1.5 font-display text-lg font-semibold tracking-wide text-[#1C1610]"
             >
               {renderInlineMarkdown(line.slice(3))}
             </h3>
@@ -48,7 +48,7 @@ export function MarkdownBrief({ markdown }: { markdown: string }) {
           return (
             <h4
               key={idx}
-              className="pt-2 text-xs font-semibold uppercase tracking-wider text-sky-400"
+              className="pt-2 font-display text-xs font-bold uppercase tracking-[0.16em] text-[#9E2A2B]"
             >
               {renderInlineMarkdown(line.slice(4))}
             </h4>
@@ -56,13 +56,19 @@ export function MarkdownBrief({ markdown }: { markdown: string }) {
         }
         if (line.startsWith("- ") || line.startsWith("* ")) {
           return (
-            <div key={idx} className="flex items-start gap-2 pl-1">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
-              <p className="flex-1">{renderInlineMarkdown(line.slice(2))}</p>
+            <div key={idx} className="flex items-start gap-2.5 pl-1">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rotate-45 bg-[#B5892E]" />
+              <p className="flex-1 text-[#1C1610]">
+                {renderInlineMarkdown(line.slice(2))}
+              </p>
             </div>
           );
         }
-        return <p key={idx}>{renderInlineMarkdown(line)}</p>;
+        return (
+          <p key={idx} className="text-[#1C1610]">
+            {renderInlineMarkdown(line)}
+          </p>
+        );
       })}
     </div>
   );
